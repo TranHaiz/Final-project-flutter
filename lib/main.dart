@@ -31,7 +31,12 @@ class Garden {
   List<EnvData> envDatas;
   Map<String, double> envParams;
 
-  Garden({required this.name, this.envDatas = const [], this.envParams = const {}});
+  Garden({
+    required this.name,
+    List<EnvData>? envDatas,
+    Map<String, double>? envParams,
+  })  : envDatas = envDatas ?? [],
+        envParams = envParams ?? {};
 
   Map<String, dynamic> toJson() => {
         "name": name,
@@ -42,9 +47,10 @@ class Garden {
   factory Garden.fromJson(Map<String, dynamic> json) {
     return Garden(
       name: json["name"],
-      envDatas: (json["envDatas"] as List<dynamic>)
-          .map((p) => EnvData.fromJson(p))
-          .toList(),
+      envDatas: (json["envDatas"] as List<dynamic>?)
+              ?.map((p) => EnvData.fromJson(p))
+              .toList() ??
+          [],
       envParams: Map<String, double>.from(json["envParams"] ?? {}),
     );
   }
@@ -73,6 +79,7 @@ class GardenManager extends StatefulWidget {
 class _GardenManagerState extends State<GardenManager> {
   List<Garden> gardens = [];
   int _selectedIndex = 0;
+  final int maxGardens = 4;
 
   final Map<String, String> envDataTypes = {
     "Xoài": "assets/xoai.png",
@@ -116,28 +123,40 @@ class _GardenManagerState extends State<GardenManager> {
         });
       } else {
         setState(() {
-          gardens = [Garden(name: "Vườn 1", envDatas: [], envParams: {})];
+          gardens = [Garden(name: "Vườn 1")];
         });
         await _saveGardens();
       }
     } catch (_) {
       setState(() {
-        gardens = [Garden(name: "Vườn 1", envDatas: [], envParams: {})];
+        gardens = [Garden(name: "Vườn 1")];
       });
       await _saveGardens();
     }
   }
 
   void _addGarden() {
-    if (gardens.length < 4) {
+    if (gardens.length < maxGardens) {
       setState(() {
-        gardens.add(Garden(name: "Vườn ${gardens.length + 1}", envDatas: [], envParams: {}));
+        gardens.add(Garden(name: "Vườn ${gardens.length + 1}"));
         _selectedIndex = gardens.length - 1;
+      });
+      _saveGardens();
+    }
+  }
+
+  void _deleteGarden(int index) {
+    if (gardens.length > 1) {
+      setState(() {
+        gardens.removeAt(index);
+        if (_selectedIndex >= gardens.length) {
+          _selectedIndex = gardens.length - 1;
+        }
       });
       _saveGardens();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Tối đa 4 vườn")),
+        const SnackBar(content: Text("Phải có ít nhất 1 vườn")),
       );
     }
   }
@@ -161,8 +180,8 @@ class _GardenManagerState extends State<GardenManager> {
                 onPressed: () {
                   setState(() {
                     gardens[_selectedIndex].envDatas.add(
-                      EnvData(name: entry.key, imagePath: entry.value),
-                    );
+                          EnvData(name: entry.key, imagePath: entry.value),
+                        );
                   });
                   _saveGardens();
                   Navigator.pop(context);
@@ -189,7 +208,8 @@ class _GardenManagerState extends State<GardenManager> {
       builder: (context) {
         final controllers = {
           for (var key in envParamsTypes)
-            key: TextEditingController(text: garden.envParams[key]?.toString() ?? "")
+            key: TextEditingController(
+                text: garden.envParams[key]?.toString() ?? "")
         };
         return AlertDialog(
           title: const Text("Chỉnh thông số môi trường"),
@@ -236,7 +256,15 @@ class _GardenManagerState extends State<GardenManager> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(currentGarden.name),
+        title: Row(
+          children: [
+            Expanded(child: Text(currentGarden.name)),
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.white),
+              onPressed: () => _deleteGarden(_selectedIndex),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.thermostat),
@@ -246,73 +274,76 @@ class _GardenManagerState extends State<GardenManager> {
       ),
       body: Stack(
         children: [
-          Positioned.fill(child: Image.asset("assets/garden.png", fit: BoxFit.cover)),
+          Positioned.fill(
+              child: Image.asset("assets/garden.png", fit: BoxFit.cover)),
           Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: currentGarden.envParams.entries.map((e) {
-                    IconData icon;
-                    Color color;
+              if (currentGarden.envParams.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: currentGarden.envParams.entries.map((e) {
+                      IconData icon;
+                      Color color;
 
-                    if (e.key.contains("Nhiệt độ")) {
-                      icon = Icons.thermostat;
-                      color = Colors.orange;
-                    } else if (e.key.contains("Độ ẩm")) {
-                      icon = Icons.water_drop;
-                      color = Colors.blue;
-                    } else if (e.key.contains("Ánh sáng")) {
-                      icon = Icons.wb_sunny;
-                      color = Colors.yellow.shade700;
-                    } else {
-                      icon = Icons.info;
-                      color = Colors.green;
-                    }
+                      if (e.key.contains("Nhiệt độ")) {
+                        icon = Icons.thermostat;
+                        color = Colors.orange;
+                      } else if (e.key.contains("Độ ẩm")) {
+                        icon = Icons.water_drop;
+                        color = Colors.blue;
+                      } else if (e.key.contains("Ánh sáng")) {
+                        icon = Icons.wb_sunny;
+                        color = Colors.yellow.shade700;
+                      } else {
+                        icon = Icons.info;
+                        color = Colors.green;
+                      }
 
-                    return Expanded(
-                      child: Card(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        elevation: 4,
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(icon, size: 32, color: color),
-                              const SizedBox(height: 8),
-                              Text(
-                                e.key,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14,
+                      return Expanded(
+                        child: Card(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 4,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(icon, size: 32, color: color),
+                                const SizedBox(height: 8),
+                                Text(
+                                  e.key,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 14,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                "${e.value}",
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: color,
+                                const SizedBox(height: 4),
+                                Text(
+                                  "${e.value}",
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: color,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  }).toList(),
+                      );
+                    }).toList(),
+                  ),
                 ),
-              ),
               Expanded(
                 child: GridView.builder(
                   padding: const EdgeInsets.all(12),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     childAspectRatio: 1.0,
                     crossAxisSpacing: 8,
@@ -340,7 +371,8 @@ class _GardenManagerState extends State<GardenManager> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Image.asset(envData.imagePath, width: 60, height: 60),
+                                  Image.asset(envData.imagePath,
+                                      width: 60, height: 60),
                                   const SizedBox(height: 8),
                                   Text(envData.name),
                                 ],
@@ -350,7 +382,8 @@ class _GardenManagerState extends State<GardenManager> {
                               right: 0,
                               top: 0,
                               child: IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.red),
+                                icon: const Icon(Icons.delete,
+                                    color: Colors.red),
                                 onPressed: () => _deleteEnvData(index),
                               ),
                             ),
@@ -368,19 +401,26 @@ class _GardenManagerState extends State<GardenManager> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
-          if (index == gardens.length) {
-            _addGarden();
-          } else {
+          if (index < gardens.length) {
             setState(() {
               _selectedIndex = index;
             });
+          } else if (index == gardens.length && gardens.length < maxGardens) {
+            _addGarden();
           }
         },
         items: [
           ...gardens.map(
-            (g) => BottomNavigationBarItem(icon: const Icon(Icons.grass), label: g.name),
+            (g) => BottomNavigationBarItem(
+              icon: const Icon(Icons.grass),
+              label: g.name,
+            ),
           ),
-          const BottomNavigationBarItem(icon: Icon(Icons.add), label: "Thêm vườn"),
+          if (gardens.length < maxGardens)
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.add),
+              label: "Thêm vườn",
+            ),
         ],
         type: BottomNavigationBarType.fixed,
       ),
