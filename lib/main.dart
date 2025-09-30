@@ -1,4 +1,3 @@
-// main.dart
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -8,44 +7,47 @@ void main() {
   runApp(const MyApp());
 }
 
-/// Lớp Cây
-class Plant {
-  final String name;
-  final String imagePath;
+/// Cây trong vườn
+class EnvData {
+  String name;
+  String imagePath;
 
-  Plant({required this.name, required this.imagePath});
+  EnvData({required this.name, required this.imagePath});
 
   Map<String, dynamic> toJson() => {
-    "name": name,
-    "imagePath": imagePath,
-  };
+        "name": name,
+        "imagePath": imagePath,
+      };
 
-  factory Plant.fromJson(Map<String, dynamic> json) {
-    return Plant(
+  factory EnvData.fromJson(Map<String, dynamic> json) {
+    return EnvData(
       name: json["name"],
       imagePath: json["imagePath"],
     );
   }
 }
 
-/// Lớp Vườn
+/// Vườn
 class Garden {
   String name;
-  List<Plant> plants;
+  List<EnvData> envDatas;
+  Map<String, double> envParams; // thêm thông số môi trường
 
-  Garden({required this.name, this.plants = const []});
+  Garden({required this.name, this.envDatas = const [], this.envParams = const {}});
 
   Map<String, dynamic> toJson() => {
-    "name": name,
-    "plants": plants.map((p) => p.toJson()).toList(),
-  };
+        "name": name,
+        "envDatas": envDatas.map((p) => p.toJson()).toList(),
+        "envParams": envParams,
+      };
 
   factory Garden.fromJson(Map<String, dynamic> json) {
     return Garden(
       name: json["name"],
-      plants: (json["plants"] as List<dynamic>)
-          .map((p) => Plant.fromJson(p))
+      envDatas: (json["envDatas"] as List<dynamic>)
+          .map((p) => EnvData.fromJson(p))
           .toList(),
+      envParams: Map<String, double>.from(json["envParams"] ?? {}),
     );
   }
 }
@@ -74,12 +76,19 @@ class _GardenManagerState extends State<GardenManager> {
   List<Garden> gardens = [];
   int _selectedIndex = 0;
 
-  /// Danh sách loại cây có sẵn (ảnh từ assets)
-  final Map<String, String> plantTypes = {
+  /// Danh sách loại cây có sẵn
+  final Map<String, String> envDataTypes = {
     "Xoài": "assets/xoai.png",
     "Táo": "assets/apple.png",
     "Sầu riêng": "assets/saurieng.png",
   };
+
+  /// Danh sách thông số môi trường mặc định
+  final List<String> envParamsTypes = [
+    "Nhiệt độ (°C)",
+    "Độ ẩm (%)",
+    "Ánh sáng (lux)"
+  ];
 
   @override
   void initState() {
@@ -87,14 +96,11 @@ class _GardenManagerState extends State<GardenManager> {
     _loadGardens();
   }
 
-  /// File lưu trữ
   Future<File> get _localFile async {
     final dir = await getApplicationDocumentsDirectory();
     return File("${dir.path}/gardens.json");
   }
 
-  /// Sắp xếp gardens theo số trong tên "Vườn N" tăng dần.
-  /// Giữ selection (nếu có) bằng tên trước khi sắp xếp.
   void _sortGardensKeepSelection() {
     String? selectedName;
     if (gardens.isNotEmpty && _selectedIndex >= 0 && _selectedIndex < gardens.length) {
@@ -103,10 +109,7 @@ class _GardenManagerState extends State<GardenManager> {
 
     int extractNumber(String name) {
       final m = RegExp(r'\d+').firstMatch(name);
-      if (m != null) {
-        return int.tryParse(m.group(0) ?? '') ?? 0;
-      }
-      return 0;
+      return m != null ? int.tryParse(m.group(0) ?? '') ?? 0 : 0;
     }
 
     gardens.sort((a, b) {
@@ -116,7 +119,6 @@ class _GardenManagerState extends State<GardenManager> {
       return a.name.compareTo(b.name);
     });
 
-    // restore selected index if possible
     if (selectedName != null) {
       final newIndex = gardens.indexWhere((g) => g.name == selectedName);
       _selectedIndex = newIndex >= 0 ? newIndex : 0;
@@ -125,19 +127,15 @@ class _GardenManagerState extends State<GardenManager> {
     }
   }
 
-  /// Lưu dữ liệu vào file
   Future<void> _saveGardens() async {
     try {
       final file = await _localFile;
       _sortGardensKeepSelection();
       final jsonData = jsonEncode(gardens.map((g) => g.toJson()).toList());
       await file.writeAsString(jsonData);
-    } catch (e) {
-      // handle error if needed
-    }
+    } catch (_) {}
   }
 
-  /// Tải dữ liệu từ file
   Future<void> _loadGardens() async {
     try {
       final file = await _localFile;
@@ -150,21 +148,20 @@ class _GardenManagerState extends State<GardenManager> {
         _sortGardensKeepSelection();
       } else {
         setState(() {
-          gardens = [Garden(name: "Vườn 1", plants: [])];
+          gardens = [Garden(name: "Vườn 1", envDatas: [], envParams: {})];
           _selectedIndex = 0;
         });
         await _saveGardens();
       }
-    } catch (e) {
+    } catch (_) {
       setState(() {
-        gardens = [Garden(name: "Vườn 1", plants: [])];
+        gardens = [Garden(name: "Vườn 1", envDatas: [], envParams: {})];
         _selectedIndex = 0;
       });
       await _saveGardens();
     }
   }
 
-  /// Tìm số nhỏ nhất chưa dùng (1..)
   int _findSmallestUnusedIndex() {
     final used = gardens.map((g) {
       final m = RegExp(r'\d+').firstMatch(g.name);
@@ -178,13 +175,11 @@ class _GardenManagerState extends State<GardenManager> {
     return i;
   }
 
-  /// Thêm vườn (dùng số nhỏ nhất chưa dùng)
   void _addGarden() {
     if (gardens.length < 4) {
       final nextIndex = _findSmallestUnusedIndex();
       setState(() {
-        gardens.add(Garden(name: "Vườn $nextIndex", plants: []));
-        // set selection to that garden after sort
+        gardens.add(Garden(name: "Vườn $nextIndex", envDatas: [], envParams: {}));
       });
       _saveGardens();
     } else {
@@ -194,19 +189,12 @@ class _GardenManagerState extends State<GardenManager> {
     }
   }
 
-  /// Xóa vườn
   void _deleteGarden(int index) {
     if (gardens.length > 1) {
-      final wasSelectedName = gardens[_selectedIndex].name;
       setState(() {
         gardens.removeAt(index);
-        // Try to keep selection consistent: if deleted one was selected, move selection to nearest index
-        if (gardens.isEmpty) {
-          _selectedIndex = 0;
-        } else if (_selectedIndex >= gardens.length) {
+        if (_selectedIndex >= gardens.length) {
           _selectedIndex = gardens.length - 1;
-        } else {
-          // keep same index if possible
         }
       });
       _saveGardens();
@@ -217,61 +205,19 @@ class _GardenManagerState extends State<GardenManager> {
     }
   }
 
-  /// Dialog quản lý vườn
-  void _showGardenDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Quản lý vườn"),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView(
-              shrinkWrap: true,
-              children: [
-                if (gardens.length < 4)
-                  ElevatedButton(
-                    onPressed: _addGarden,
-                    child: const Text("➕ Thêm vườn"),
-                  ),
-                const SizedBox(height: 8),
-                ...gardens.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final garden = entry.value;
-                  return ListTile(
-                    leading: Image.asset("assets/garden.png", width: 40, height: 40),
-                    title: Text(garden.name),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _deleteGarden(index);
-                      },
-                    ),
-                  );
-                }).toList(),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  /// Thêm cây (chọn loại từ assets)
-  void _addPlant() {
-    if (gardens[_selectedIndex].plants.length < 10) {
+  void _addEnvData() {
+    if (gardens[_selectedIndex].envDatas.length < 10) {
       showDialog(
         context: context,
         builder: (context) {
           return SimpleDialog(
             title: const Text("Chọn loại cây"),
-            children: plantTypes.entries.map((entry) {
+            children: envDataTypes.entries.map((entry) {
               return SimpleDialogOption(
                 onPressed: () {
                   setState(() {
-                    gardens[_selectedIndex].plants.add(
-                      Plant(name: entry.key, imagePath: entry.value),
+                    gardens[_selectedIndex].envDatas.add(
+                      EnvData(name: entry.key, imagePath: entry.value),
                     );
                   });
                   _saveGardens();
@@ -289,19 +235,59 @@ class _GardenManagerState extends State<GardenManager> {
           );
         },
       );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Mỗi vườn tối đa 10 cây")),
-      );
     }
   }
 
-  /// Xóa cây
-  void _deletePlant(int plantIndex) {
+  void _deleteEnvData(int envDataIndex) {
     setState(() {
-      gardens[_selectedIndex].plants.removeAt(plantIndex);
+      gardens[_selectedIndex].envDatas.removeAt(envDataIndex);
     });
     _saveGardens();
+  }
+
+  void _editEnvParams() {
+    final garden = gardens[_selectedIndex];
+    showDialog(
+      context: context,
+      builder: (context) {
+        final controllers = {
+          for (var key in envParamsTypes)
+            key: TextEditingController(text: garden.envParams[key]?.toString() ?? "")
+        };
+        return AlertDialog(
+          title: const Text("Chỉnh thông số môi trường"),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: envParamsTypes.map((param) {
+                return TextField(
+                  controller: controllers[param],
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(labelText: param),
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  for (var param in envParamsTypes) {
+                    final val = double.tryParse(controllers[param]!.text);
+                    if (val != null) {
+                      garden.envParams[param] = val;
+                    }
+                  }
+                });
+                _saveGardens();
+                Navigator.pop(context);
+              },
+              child: const Text("Lưu"),
+            )
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -316,87 +302,101 @@ class _GardenManagerState extends State<GardenManager> {
         title: Text(currentGarden.name),
         actions: [
           IconButton(
+            icon: const Icon(Icons.thermostat),
+            onPressed: _editEnvParams,
+          ),
+          IconButton(
             icon: const Icon(Icons.manage_accounts),
-            onPressed: _showGardenDialog,
+            onPressed: _addGarden,
           ),
         ],
       ),
       body: Stack(
         children: [
-          // Background image
-          Positioned.fill(
-            child: Image.asset("assets/garden.png", fit: BoxFit.cover),
-          ),
-          // Grid of plants
-          GridView.builder(
-            padding: const EdgeInsets.all(12),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 1.0,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemCount: currentGarden.plants.length +
-                (currentGarden.plants.length < 10 ? 1 : 0),
-            itemBuilder: (context, index) {
-              if (index == currentGarden.plants.length &&
-                  currentGarden.plants.length < 10) {
-                return GestureDetector(
-                  onTap: _addPlant,
-                  child: Card(
-                    color: Colors.green[50],
-                    child: const Center(child: Text("➕ Thêm cây")),
+          Positioned.fill(child: Image.asset("assets/garden.png", fit: BoxFit.cover)),
+          Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
+                  children: currentGarden.envParams.entries.map((e) {
+                    return Text("${e.key}: ${e.value}");
+                  }).toList(),
+                ),
+              ),
+              Expanded(
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(12),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    childAspectRatio: 1.0,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
                   ),
-                );
-              } else {
-                final plant = currentGarden.plants[index];
-                return Card(
-                  elevation: 2,
-                  child: Stack(
-                    children: [
-                      Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                  itemCount: currentGarden.envDatas.length +
+                      (currentGarden.envDatas.length < 10 ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == currentGarden.envDatas.length &&
+                        currentGarden.envDatas.length < 10) {
+                      return GestureDetector(
+                        onTap: _addEnvData,
+                        child: Card(
+                          color: Colors.green[50],
+                          child: const Center(child: Text("➕ Thêm cây")),
+                        ),
+                      );
+                    } else {
+                      final envData = currentGarden.envDatas[index];
+                      return Card(
+                        elevation: 2,
+                        child: Stack(
                           children: [
-                            Image.asset(plant.imagePath, width: 60, height: 60, fit: BoxFit.contain),
-                            const SizedBox(height: 8),
-                            Text(plant.name),
+                            Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Image.asset(envData.imagePath, width: 60, height: 60),
+                                  const SizedBox(height: 8),
+                                  Text(envData.name),
+                                ],
+                              ),
+                            ),
+                            Positioned(
+                              right: 0,
+                              top: 0,
+                              child: IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () => _deleteEnvData(index),
+                              ),
+                            ),
                           ],
                         ),
-                      ),
-                      Positioned(
-                        right: 0,
-                        top: 0,
-                        child: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () => _deletePlant(index),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-            },
+                      );
+                    }
+                  },
+                ),
+              ),
+            ],
           ),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          if (index == gardens.length) {
-            _showGardenDialog();
-          } else {
-            setState(() {
-              _selectedIndex = index;
-            });
-          }
-        },
-        items: [
-          ...gardens.map((g) => BottomNavigationBarItem(icon: const Icon(Icons.grass), label: g.name)),
-          if (gardens.length < 4) const BottomNavigationBarItem(icon: Icon(Icons.add), label: "Thêm"),
-        ],
-        type: BottomNavigationBarType.fixed,
-      ),
+      bottomNavigationBar: gardens.length >= 2
+          ? BottomNavigationBar(
+              currentIndex: _selectedIndex,
+              onTap: (index) {
+                setState(() {
+                  _selectedIndex = index;
+                });
+              },
+              items: gardens
+                  .map((g) => BottomNavigationBarItem(
+                        icon: const Icon(Icons.grass),
+                        label: g.name,
+                      ))
+                  .toList(),
+              type: BottomNavigationBarType.fixed,
+            )
+          : null,
     );
   }
 }
