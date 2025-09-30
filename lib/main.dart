@@ -142,6 +142,10 @@ class _GardenManagerState extends State<GardenManager> {
         _selectedIndex = gardens.length - 1;
       });
       _saveGardens();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Số lượng vườn đã đạt tối đa")),
+      );
     }
   }
 
@@ -258,11 +262,15 @@ class _GardenManagerState extends State<GardenManager> {
       appBar: AppBar(
         title: Row(
           children: [
-            Expanded(child: Text(currentGarden.name)),
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.white),
-              onPressed: () => _deleteGarden(_selectedIndex),
-            ),
+            Text(currentGarden.name),
+            const SizedBox(width: 8),
+            if (gardens.length > 1)
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(Icons.close, color: Colors.red, size: 20),
+                onPressed: () => _deleteGarden(_selectedIndex),
+              ),
           ],
         ),
         actions: [
@@ -308,25 +316,25 @@ class _GardenManagerState extends State<GardenManager> {
                           ),
                           elevation: 4,
                           child: Padding(
-                            padding: const EdgeInsets.all(16.0),
+                            padding: const EdgeInsets.all(12.0),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(icon, size: 32, color: color),
-                                const SizedBox(height: 8),
+                                Icon(icon, size: 28, color: color),
+                                const SizedBox(height: 6),
                                 Text(
                                   e.key,
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w500,
-                                    fontSize: 14,
+                                    fontSize: 13,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 3),
                                 Text(
                                   "${e.value}",
                                   style: TextStyle(
-                                    fontSize: 18,
+                                    fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                     color: color,
                                   ),
@@ -398,31 +406,45 @@ class _GardenManagerState extends State<GardenManager> {
           ),
         ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          if (index < gardens.length) {
-            setState(() {
-              _selectedIndex = index;
-            });
-          } else if (index == gardens.length && gardens.length < maxGardens) {
-            _addGarden();
-          }
-        },
-        items: [
-          ...gardens.map(
-            (g) => BottomNavigationBarItem(
-              icon: const Icon(Icons.grass),
-              label: g.name,
-            ),
+      bottomNavigationBar: BottomAppBar(
+        child: SizedBox(
+          height: 60, // ✅ Fix overflow
+          child: Row(
+            children: [
+              for (int i = 0; i < gardens.length; i++)
+                Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _selectedIndex = i;
+                      });
+                    },
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.grass,
+                            size: 20,
+                            color: i == _selectedIndex
+                                ? Colors.green
+                                : Colors.grey),
+                        Text(gardens[i].name,
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: i == _selectedIndex
+                                    ? Colors.green
+                                    : Colors.grey)),
+                      ],
+                    ),
+                  ),
+                ),
+              if (gardens.length < maxGardens)
+                IconButton(
+                  icon: const Icon(Icons.add, color: Colors.green),
+                  onPressed: _addGarden,
+                ),
+            ],
           ),
-          if (gardens.length < maxGardens)
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.add),
-              label: "Thêm vườn",
-            ),
-        ],
-        type: BottomNavigationBarType.fixed,
+        ),
       ),
     );
   }
