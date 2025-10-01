@@ -30,7 +30,7 @@ class _GardenManagerState extends State<GardenManager> {
   final List<String> envParamsTypes = [
     "Nhiệt độ (°C)",
     "Độ ẩm (%)",
-    "Ánh sáng (lux)"
+    "Ánh sáng (lux)",
   ];
 
   @override
@@ -64,9 +64,9 @@ class _GardenManagerState extends State<GardenManager> {
 
   void _removeGarden(int index) {
     if (gardens.length <= 1) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Phải có ít nhất 1 vườn")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Phải có ít nhất 1 vườn")));
       return;
     }
     setState(() {
@@ -119,15 +119,6 @@ class _GardenManagerState extends State<GardenManager> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.logout, color: Colors.red),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => const LoginScreen()),
-            );
-          },
-        ),
         title: Row(
           children: [
             Text(garden.name),
@@ -142,9 +133,15 @@ class _GardenManagerState extends State<GardenManager> {
           ],
         ),
         actions: [
+          IconButton(icon: const Icon(Icons.tune), onPressed: _editEnvParams),
           IconButton(
-            icon: const Icon(Icons.tune),
-            onPressed: _editEnvParams,
+            icon: const Icon(Icons.logout, color: Colors.red),
+            onPressed: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+              );
+            },
           ),
         ],
       ),

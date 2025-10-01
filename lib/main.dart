@@ -15,6 +15,7 @@ class MyApp extends StatelessWidget {
       title: 'Smart Garden',
       theme: ThemeData(primarySwatch: Colors.green),
       home: const LoginScreen(), // mở login trước
+      debugShowCheckedModeBanner: false,
     );
   }
 }
