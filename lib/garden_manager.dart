@@ -1,10 +1,11 @@
-// Màn hình quản lý vườn: hiển thị EnvDataGrid + chỉnh thông số môi trường + bottom navigation
+// lib/garden_manager.dart
+// Màn hình quản lý vườn: hiển thị thông số môi trường, quản lý cây và vườn
 
 import 'package:flutter/material.dart';
 import 'data_types.dart';
 import 'garden_storage.dart';
-import 'env_data_grid.dart';
 import 'env_params_editor.dart';
+import 'env_data_grid.dart';
 import 'garden_bottom_nav.dart';
 
 class GardenManager extends StatefulWidget {
@@ -17,16 +18,19 @@ class GardenManager extends StatefulWidget {
 class _GardenManagerState extends State<GardenManager> {
   List<Garden> gardens = [];
   int selectedIndex = 0;
-  final int maxGardens = 3;
+  final int maxGardens = 4;
 
   final Map<String, String> envDataTypes = {
-    "Cây Cam": "assets/images/cam.png",
-    "Cây Táo": "assets/images/tao.png",
-    "Cây Xoài": "assets/images/xoai.png",
-    "Cây Bưởi": "assets/images/buoi.png",
+    "Xoài": "assets/xoai.png",
+    "Táo": "assets/apple.png",
+    "Sầu riêng": "assets/saurieng.png",
   };
 
-  final List<String> envParamsTypes = ["Nhiệt độ", "Độ ẩm", "Ánh sáng"];
+  final List<String> envParamsTypes = [
+    "Nhiệt độ (°C)",
+    "Độ ẩm (%)",
+    "Ánh sáng (lux)"
+  ];
 
   @override
   void initState() {
@@ -44,7 +48,12 @@ class _GardenManagerState extends State<GardenManager> {
   }
 
   void _addGarden() {
-    if (gardens.length >= maxGardens) return;
+    if (gardens.length >= maxGardens) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Số lượng vườn đã đạt tối đa")),
+      );
+      return;
+    }
     setState(() {
       gardens.add(Garden(name: "Vườn ${gardens.length + 1}"));
       selectedIndex = gardens.length - 1;
@@ -53,10 +62,16 @@ class _GardenManagerState extends State<GardenManager> {
   }
 
   void _removeGarden(int index) {
+    if (gardens.length <= 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Phải có ít nhất 1 vườn")),
+      );
+      return;
+    }
     setState(() {
       gardens.removeAt(index);
       if (selectedIndex >= gardens.length) {
-        selectedIndex = gardens.isEmpty ? 0 : gardens.length - 1;
+        selectedIndex = gardens.length - 1;
       }
     });
     _saveGardens();
@@ -77,14 +92,15 @@ class _GardenManagerState extends State<GardenManager> {
   }
 
   void _editEnvParams() {
+    final garden = gardens[selectedIndex];
     showDialog(
       context: context,
-      builder: (ctx) => EnvParamsEditor(
-        garden: gardens[selectedIndex],
+      builder: (context) => EnvParamsEditor(
+        garden: garden,
         envParamsTypes: envParamsTypes,
         onSave: (newParams) {
           setState(() {
-            gardens[selectedIndex].envParams = newParams;
+            garden.envParams = newParams;
           });
           _saveGardens();
         },
@@ -102,42 +118,88 @@ class _GardenManagerState extends State<GardenManager> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text("Quản lý: ${garden.name}"),
+        title: Row(
+          children: [
+            Text(garden.name),
+            const SizedBox(width: 6),
+            if (gardens.length > 1)
+              IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(Icons.close, color: Colors.red, size: 20),
+                onPressed: () => _removeGarden(selectedIndex),
+              ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.tune),
             onPressed: _editEnvParams,
           ),
-          IconButton(
-            icon: const Icon(Icons.delete, color: Colors.red),
-            onPressed: () => _removeGarden(selectedIndex),
-          ),
         ],
       ),
       body: Column(
         children: [
+          if (garden.envParams.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: garden.envParams.entries.map((e) {
+                  IconData icon;
+                  Color color;
+                  if (e.key.contains("Nhiệt độ")) {
+                    icon = Icons.thermostat;
+                    color = Colors.orange;
+                  } else if (e.key.contains("Độ ẩm")) {
+                    icon = Icons.water_drop;
+                    color = Colors.blue;
+                  } else {
+                    icon = Icons.wb_sunny;
+                    color = Colors.yellow.shade700;
+                  }
+                  return Expanded(
+                    child: Card(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 4,
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Column(
+                          children: [
+                            Icon(icon, size: 28, color: color),
+                            const SizedBox(height: 6),
+                            Text(
+                              e.key,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "${e.value}",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: color,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
           Expanded(
-            flex: 2,
             child: EnvDataGrid(
               envDatas: garden.envDatas,
               envDataTypes: envDataTypes,
               onAdd: _addEnvData,
               onDelete: _deleteEnvData,
-            ),
-          ),
-          Expanded(
-            flex: 1,
-            child: ListView(
-              padding: const EdgeInsets.all(12),
-              children: garden.envParams.entries.map((e) {
-                return Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.thermostat, color: Colors.green),
-                    title: Text(e.key),
-                    trailing: Text("${e.value}"),
-                  ),
-                );
-              }).toList(),
             ),
           ),
         ],
