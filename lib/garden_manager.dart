@@ -53,32 +53,41 @@ class _GardenManagerState extends State<GardenManager> {
   }
 
   void _addGarden() {
-    if (gardens.length >= maxGardens) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Số lượng vườn đã đạt tối đa")));
-      return;
-    }
-    setState(() {
-      final g = Garden(name: "Vườn ${gardens.length + 1}");
-      for (var key in envParamsTypes) g.envParams[key] = 0;
-      gardens.add(g);
-      selectedIndex = gardens.length - 1;
-    });
-    _saveGardens();
+  if (gardens.length >= maxGardens) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text("Số lượng vườn đã đạt tối đa")));
+    return;
   }
+  setState(() {
+    final g = Garden(name: "Vườn ${gardens.length + 1}");
+    for (var key in envParamsTypes) g.envParams[key] = 0;
+    gardens.add(g);
+    selectedIndex = gardens.length - 1;
+    _updateGardenNames();
+  });
+  _saveGardens();
+}
 
-  void _removeGarden(int index) {
-    if (gardens.length <= 1) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text("Phải có ít nhất 1 vườn")));
-      return;
-    }
-    setState(() {
-      gardens.removeAt(index);
-      if (selectedIndex >= gardens.length) selectedIndex = gardens.length - 1;
-    });
-    _saveGardens();
+void _removeGarden(int index) {
+  if (gardens.length <= 1) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text("Phải có ít nhất 1 vườn")));
+    return;
   }
+  setState(() {
+    gardens.removeAt(index);
+    if (selectedIndex >= gardens.length) selectedIndex = gardens.length - 1;
+    _updateGardenNames();
+  });
+  _saveGardens();
+}
+
+// Hàm cập nhật lại tên vườn theo thứ tự trong danh sách
+void _updateGardenNames() {
+  for (int i = 0; i < gardens.length; i++) {
+    gardens[i].name = "Vườn ${i + 1}";
+  }
+}
 
   void _addEnvData(EnvData envData) {
     setState(() {
