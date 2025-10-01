@@ -7,6 +7,7 @@ import 'garden_storage.dart';
 import 'env_params_editor.dart';
 import 'env_data_grid.dart';
 import 'garden_bottom_nav.dart';
+import 'logic_screen.dart'; // để điều hướng quay lại login
 
 class GardenManager extends StatefulWidget {
   const GardenManager({super.key});
@@ -118,6 +119,15 @@ class _GardenManagerState extends State<GardenManager> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.logout, color: Colors.red),
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+            );
+          },
+        ),
         title: Row(
           children: [
             Text(garden.name),
