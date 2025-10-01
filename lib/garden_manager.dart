@@ -1,13 +1,10 @@
 // lib/garden_manager.dart
-// Màn hình quản lý vườn: hiển thị thông số môi trường, quản lý cây và vườn
-
 import 'package:flutter/material.dart';
 import 'data_types.dart';
 import 'garden_storage.dart';
-import 'env_params_editor.dart';
 import 'env_data_grid.dart';
 import 'garden_bottom_nav.dart';
-import 'logic_screen.dart'; // để điều hướng quay lại login
+import 'logic_screen.dart';
 
 class GardenManager extends StatefulWidget {
   const GardenManager({super.key});
@@ -41,7 +38,14 @@ class _GardenManagerState extends State<GardenManager> {
 
   Future<void> _loadGardens() async {
     final data = await GardenStorage.loadGardens();
-    setState(() => gardens = data);
+    setState(() {
+      gardens = data;
+      for (var g in gardens) {
+        for (var key in envParamsTypes) {
+          g.envParams.putIfAbsent(key, () => 0);
+        }
+      }
+    });
   }
 
   Future<void> _saveGardens() async {
@@ -51,12 +55,13 @@ class _GardenManagerState extends State<GardenManager> {
   void _addGarden() {
     if (gardens.length >= maxGardens) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Số lượng vườn đã đạt tối đa")),
-      );
+          const SnackBar(content: Text("Số lượng vườn đã đạt tối đa")));
       return;
     }
     setState(() {
-      gardens.add(Garden(name: "Vườn ${gardens.length + 1}"));
+      final g = Garden(name: "Vườn ${gardens.length + 1}");
+      for (var key in envParamsTypes) g.envParams[key] = 0;
+      gardens.add(g);
       selectedIndex = gardens.length - 1;
     });
     _saveGardens();
@@ -64,16 +69,13 @@ class _GardenManagerState extends State<GardenManager> {
 
   void _removeGarden(int index) {
     if (gardens.length <= 1) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Phải có ít nhất 1 vườn")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("Phải có ít nhất 1 vườn")));
       return;
     }
     setState(() {
       gardens.removeAt(index);
-      if (selectedIndex >= gardens.length) {
-        selectedIndex = gardens.length - 1;
-      }
+      if (selectedIndex >= gardens.length) selectedIndex = gardens.length - 1;
     });
     _saveGardens();
   }
@@ -92,21 +94,14 @@ class _GardenManagerState extends State<GardenManager> {
     _saveGardens();
   }
 
-  void _editEnvParams() {
-    final garden = gardens[selectedIndex];
-    showDialog(
-      context: context,
-      builder: (context) => EnvParamsEditor(
-        garden: garden,
-        envParamsTypes: envParamsTypes,
-        onSave: (newParams) {
-          setState(() {
-            garden.envParams = newParams;
-          });
-          _saveGardens();
-        },
-      ),
-    );
+  void updateEnvParams(Map<String, double> newData) {
+    setState(() {
+      final garden = gardens[selectedIndex];
+      for (var key in envParamsTypes) {
+        garden.envParams[key] = newData[key] ?? 0;
+      }
+    });
+    _saveGardens();
   }
 
   @override
@@ -133,7 +128,6 @@ class _GardenManagerState extends State<GardenManager> {
           ],
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.tune), onPressed: _editEnvParams),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.red),
             onPressed: () {
@@ -147,60 +141,58 @@ class _GardenManagerState extends State<GardenManager> {
       ),
       body: Column(
         children: [
-          if (garden.envParams.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: garden.envParams.entries.map((e) {
-                  IconData icon;
-                  Color color;
-                  if (e.key.contains("Nhiệt độ")) {
-                    icon = Icons.thermostat;
-                    color = Colors.orange;
-                  } else if (e.key.contains("Độ ẩm")) {
-                    icon = Icons.water_drop;
-                    color = Colors.blue;
-                  } else {
-                    icon = Icons.wb_sunny;
-                    color = Colors.yellow.shade700;
-                  }
-                  return Expanded(
-                    child: Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 4,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Column(
-                          children: [
-                            Icon(icon, size: 28, color: color),
-                            const SizedBox(height: 6),
-                            Text(
-                              e.key,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "${e.value}",
-                              style: TextStyle(
+          // Hiển thị thông số môi trường
+          Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: envParamsTypes.map((key) {
+                final val = garden.envParams[key] ?? 0;
+                IconData icon;
+                Color color;
+                if (key.contains("Nhiệt độ")) {
+                  icon = Icons.thermostat;
+                  color = Colors.orange;
+                } else if (key.contains("Độ ẩm")) {
+                  icon = Icons.water_drop;
+                  color = Colors.blue;
+                } else {
+                  icon = Icons.wb_sunny;
+                  color = Colors.yellow.shade700;
+                }
+                return Expanded(
+                  child: Card(
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16)),
+                    elevation: 4,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        children: [
+                          Icon(icon, size: 28, color: color),
+                          const SizedBox(height: 6),
+                          Text(
+                            key,
+                            style: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w500),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "$val",
+                            style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: color,
-                              ),
-                            ),
-                          ],
-                        ),
+                                color: color),
+                          ),
+                        ],
                       ),
                     ),
-                  );
-                }).toList(),
-              ),
+                  ),
+                );
+              }).toList(),
             ),
+          ),
+          // Hiển thị cây
           Expanded(
             child: EnvDataGrid(
               envDatas: garden.envDatas,
