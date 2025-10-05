@@ -7,7 +7,7 @@ import 'data_types.dart'; // Định nghĩa các lớp Garden, EnvData
 import 'garden_storage.dart'; // Lưu trữ và tải dữ liệu vườn
 import 'env_data_grid.dart'; // Grid hiển thị cây trong vườn
 import 'garden_bottom_nav.dart'; // Bottom navigation hiển thị các vườn
-import 'logic_screen.dart'; // Login screen để logout
+import 'login_screen.dart'; // Login screen để logout
 
 /* Private variables -------------------------------------------------- */
 final int maxGardens = 4; // Giới hạn số lượng vườn tối đa
