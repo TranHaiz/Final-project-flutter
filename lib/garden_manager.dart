@@ -1,6 +1,7 @@
 // lib/garden_manager.dart
 // Màn hình quản lý vườn: hiển thị thông số môi trường, quản lý cây và vườn
 
+/* Includes ----------------------------------------------------------- */
 import 'package:flutter/material.dart';
 import 'data_types.dart'; // Định nghĩa các lớp Garden, EnvData
 import 'garden_storage.dart'; // Lưu trữ và tải dữ liệu vườn
@@ -8,6 +9,24 @@ import 'env_data_grid.dart'; // Grid hiển thị cây trong vườn
 import 'garden_bottom_nav.dart'; // Bottom navigation hiển thị các vườn
 import 'logic_screen.dart'; // Login screen để logout
 
+/* Private variables -------------------------------------------------- */
+final int maxGardens = 4; // Giới hạn số lượng vườn tối đa
+
+// Các loại cây có thể thêm
+final Map<String, String> envDataTypes = {
+  "Xoài": "assets/xoai.png",
+  "Táo": "assets/apple.png",
+  "Sầu riêng": "assets/saurieng.png",
+};
+
+// Các thông số môi trường cần hiển thị
+final List<String> envParamsTypes = [
+  "Nhiệt độ (°C)",
+  "Độ ẩm (%)",
+  "Ánh sáng (lux)",
+];
+
+/* Function definitions ----------------------------------------------- */
 class GardenManager extends StatefulWidget {
   const GardenManager({super.key});
 
@@ -18,21 +37,6 @@ class GardenManager extends StatefulWidget {
 class _GardenManagerState extends State<GardenManager> {
   List<Garden> gardens = []; // Danh sách vườn
   int selectedIndex = 0; // Chỉ số vườn hiện tại
-  final int maxGardens = 4; // Giới hạn số lượng vườn tối đa
-
-  // Các loại cây có thể thêm
-  final Map<String, String> envDataTypes = {
-    "Xoài": "assets/xoai.png",
-    "Táo": "assets/apple.png",
-    "Sầu riêng": "assets/saurieng.png",
-  };
-
-  // Các thông số môi trường cần hiển thị
-  final List<String> envParamsTypes = [
-    "Nhiệt độ (°C)",
-    "Độ ẩm (%)",
-    "Ánh sáng (lux)",
-  ];
 
   @override
   void initState() {
@@ -40,6 +44,7 @@ class _GardenManagerState extends State<GardenManager> {
     _loadGardens(); // Load dữ liệu vườn khi mở màn hình
   }
 
+  /* Private definitions ----------------------------------------------- */
   // Load dữ liệu vườn từ storage
   Future<void> _loadGardens() async {
     final data = await GardenStorage.loadGardens();
@@ -47,31 +52,30 @@ class _GardenManagerState extends State<GardenManager> {
       gardens = data;
       // Nếu chưa có giá trị môi trường thì mặc định 0
       for (var g in gardens) {
-        for (var key in envParamsTypes) {
-          g.envParams.putIfAbsent(key, () => 0);
-        }
+        for (var key in envParamsTypes) g.envParams.putIfAbsent(key, () => 0);
       }
     });
   }
 
   // Lưu dữ liệu vườn xuống storage
-  Future<void> _saveGardens() async {
-    await GardenStorage.saveGardens(gardens);
-  }
+  Future<void> _saveGardens() async => await GardenStorage.saveGardens(gardens);
 
   // Thêm vườn mới
   void _addGarden() {
     if (gardens.length >= maxGardens) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text("Số lượng vườn đã đạt tối đa")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Số lượng vườn đã đạt tối đa")),
+      );
       return;
     }
     setState(() {
-      final g = Garden(name: "Vườn ${gardens.length + 1}");
-      for (var key in envParamsTypes) g.envParams[key] = 0; // Giá trị mặc định
-      gardens.add(g);
+      gardens.add(
+        Garden(
+          name: "Vườn ${gardens.length + 1}",
+          envParams: {for (var k in envParamsTypes) k: 0}, // Giá trị mặc định
+        ),
+      );
       selectedIndex = gardens.length - 1; // Chọn vườn mới thêm
-      _updateGardenNames(); // Cập nhật lại tên vườn theo thứ tự
     });
     _saveGardens();
   }
@@ -79,38 +83,30 @@ class _GardenManagerState extends State<GardenManager> {
   // Xóa vườn
   void _removeGarden(int index) {
     if (gardens.length <= 1) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text("Phải có ít nhất 1 vườn")));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Phải có ít nhất 1 vườn")));
       return;
     }
     setState(() {
       gardens.removeAt(index);
       if (selectedIndex >= gardens.length) selectedIndex = gardens.length - 1;
-      _updateGardenNames(); // Cập nhật lại tên vườn sau khi xóa
+      // Cập nhật lại tên vườn theo thứ tự
+      for (int i = 0; i < gardens.length; i++)
+        gardens[i].name = "Vườn ${i + 1}";
     });
     _saveGardens();
   }
 
-  // Cập nhật lại tên vườn theo thứ tự trong danh sách
-  void _updateGardenNames() {
-    for (int i = 0; i < gardens.length; i++) {
-      gardens[i].name = "Vườn ${i + 1}";
-    }
-  }
-
   // Thêm cây vào vườn
   void _addEnvData(EnvData envData) {
-    setState(() {
-      gardens[selectedIndex].envDatas.add(envData);
-    });
+    setState(() => gardens[selectedIndex].envDatas.add(envData));
     _saveGardens();
   }
 
   // Xóa cây trong vườn
   void _deleteEnvData(int index) {
-    setState(() {
-      gardens[selectedIndex].envDatas.removeAt(index);
-    });
+    setState(() => gardens[selectedIndex].envDatas.removeAt(index));
     _saveGardens();
   }
 
@@ -119,19 +115,17 @@ class _GardenManagerState extends State<GardenManager> {
     setState(() {
       final garden = gardens[selectedIndex];
       for (var key in envParamsTypes) {
-        // Nếu chưa nhận được dữ liệu thì mặc định = 0
-        garden.envParams[key] = newData[key] ?? 0;
+        garden.envParams[key] = newData[key] ?? 0; // Nếu chưa nhận dữ liệu = 0
       }
     });
     _saveGardens();
   }
 
+  /* Widget definitions ----------------------------------------------- */
   @override
   Widget build(BuildContext context) {
-    if (gardens.isEmpty) {
-      // Hiển thị loading nếu chưa load xong dữ liệu
+    if (gardens.isEmpty)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
 
     final garden = gardens[selectedIndex];
 
@@ -172,7 +166,7 @@ class _GardenManagerState extends State<GardenManager> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: envParamsTypes.map((key) {
-                final val = garden.envParams[key] ?? 0; // Lấy dữ liệu môi trường
+                final val = garden.envParams[key] ?? 0;
                 IconData icon;
                 Color color;
                 if (key.contains("Nhiệt độ")) {
@@ -188,7 +182,8 @@ class _GardenManagerState extends State<GardenManager> {
                 return Expanded(
                   child: Card(
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     elevation: 4,
                     child: Padding(
                       padding: const EdgeInsets.all(12.0),
@@ -199,15 +194,18 @@ class _GardenManagerState extends State<GardenManager> {
                           Text(
                             key,
                             style: const TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w500),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             "$val",
                             style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: color),
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: color,
+                            ),
                           ),
                         ],
                       ),
