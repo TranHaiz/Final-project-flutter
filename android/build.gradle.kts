@@ -1,7 +1,7 @@
 allprojects {
     repositories {
         google()
-        mavenCentral()
+        mavenCentral()  // Thay jcenter() bằng mavenCentral()
     }
 }
 
