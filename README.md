@@ -1,12 +1,34 @@
-# Changelog
+# 🌱 Smart Garden App
 
-All notable changes to this project will be documented in this file.
+A mobile application for smart garden management — allowing users to log in, monitor plant environments, and control devices via classic Bluetooth.
 
-## [1.0.1] - Unreleased
-### Added
-- Login / Logout functionality.
-- Minor improvements to the garden management UI.
+## 🚀 Features
 
-## [1.0.0] - Initial release
-### Added
-- Basic garden management menu (create garden, add/remove plants, display environmental parameters).
+- 🔐 **Login System** — Secure login and logout.
+- 🌿 **Garden Manager** — Create, edit, and remove gardens and plants; view environmental data.
+- 📶 **Bluetooth Control** — Connect and interact with garden devices using classic Bluetooth.
+
+## 📝 Release Notes
+
+### [1.0.1]
+
+#### Added
+
+- Implemented **Login / Logout** functionality.
+- Improved **Garden Management UI** for better user experience.
+- Added **Bluetooth Connection** feature for device control.
+
+### [1.0.0]
+
+#### Added
+
+- Basic **Garden Management Menu**:
+  - Create new garden
+  - Add / Remove plants
+  - Display environmental parameters (e.g., temperature, humidity)
+
+## 🧩 Tech Stack
+
+- **Language:** Dart / Flutter  
+- **Connectivity:** Classic Bluetooth  
+- **Platform:** Android  
