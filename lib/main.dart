@@ -15,7 +15,8 @@ class Plant {
   String name;
   Plant({required this.name});
   Map<String, dynamic> toJson() => {"name": name};
-  factory Plant.fromJson(Map<String, dynamic> json) => Plant(name: json["name"]);
+  factory Plant.fromJson(Map<String, dynamic> json) =>
+      Plant(name: json["name"]);
 }
 
 class Garden {
@@ -28,7 +29,8 @@ class Garden {
       };
   factory Garden.fromJson(Map<String, dynamic> json) => Garden(
         name: json["name"],
-        plants: (json["plants"] as List<dynamic>?)?.map((p) => Plant.fromJson(p)).toList() ?? [],
+        plants:
+            (json["plants"] as List<dynamic>?)?.map((p) => Plant.fromJson(p)).toList() ?? [],
       );
 }
 
@@ -69,7 +71,9 @@ class _GardenScreenState extends State<GardenScreen> {
 
   Future<void> saveGardens() async {
     final file = await localFile;
-    await file.writeAsString(jsonEncode(gardens.map((g) => g.toJson()).toList()));
+    await file.writeAsString(
+      jsonEncode(gardens.map((g) => g.toJson()).toList()),
+    );
   }
 
   Future<void> loadGardens() async {
@@ -86,7 +90,7 @@ class _GardenScreenState extends State<GardenScreen> {
   }
 
   void addGarden() {
-    if (gardens.length >= maxGardens) return; // Giới hạn 4 vườn
+    if (gardens.length >= maxGardens) return;
     setState(() {
       gardens.add(Garden(name: "Vườn ${gardens.length + 1}"));
       selectedGarden = gardens.length - 1;
@@ -97,7 +101,6 @@ class _GardenScreenState extends State<GardenScreen> {
   void deleteGarden(int index) {
     setState(() {
       gardens.removeAt(index);
-      // Cập nhật lại tên vườn để đúng số thứ tự
       for (int i = 0; i < gardens.length; i++) {
         gardens[i].name = "Vườn ${i + 1}";
       }
@@ -119,20 +122,24 @@ class _GardenScreenState extends State<GardenScreen> {
       builder: (_) => SimpleDialog(
         title: const Text("Chọn cây"),
         children: plantTypes
-            .map((p) => SimpleDialogOption(
-                  onPressed: () {
-                    setState(() => gardens[selectedGarden].plants.add(Plant(name: p)));
-                    saveGardens();
-                    Navigator.pop(context);
-                  },
-                  child: Row(
-                    children: [
-                      const Icon(Icons.local_florist, color: Colors.green),
-                      const SizedBox(width: 8),
-                      Text(p),
-                    ],
-                  ),
-                ))
+            .map(
+              (p) => SimpleDialogOption(
+                onPressed: () {
+                  setState(
+                    () => gardens[selectedGarden].plants.add(Plant(name: p)),
+                  );
+                  saveGardens();
+                  Navigator.pop(context);
+                },
+                child: Row(
+                  children: [
+                    const Icon(Icons.local_florist, color: Colors.green),
+                    const SizedBox(width: 8),
+                    Text(p),
+                  ],
+                ),
+              ),
+            )
             .toList(),
       ),
     );
@@ -149,8 +156,14 @@ class _GardenScreenState extends State<GardenScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: tempController, decoration: const InputDecoration(labelText: "Nhiệt độ")),
-            TextField(controller: humidityController, decoration: const InputDecoration(labelText: "Độ ẩm")),
+            TextField(
+              controller: tempController,
+              decoration: const InputDecoration(labelText: "Nhiệt độ"),
+            ),
+            TextField(
+              controller: humidityController,
+              decoration: const InputDecoration(labelText: "Độ ẩm"),
+            ),
           ],
         ),
         actions: [
@@ -175,24 +188,39 @@ class _GardenScreenState extends State<GardenScreen> {
       child: ListTile(
         leading: const Icon(Icons.local_florist, color: Colors.green),
         title: Text(plant.name),
-        trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => deletePlant(index)),
+        trailing: IconButton(
+          icon: const Icon(Icons.delete, color: Colors.red),
+          onPressed: () => deletePlant(index),
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (gardens.isEmpty) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (gardens.isEmpty)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     final garden = gardens[selectedGarden];
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(garden.name),
+        title: Row(
+          children: [
+            Text(garden.name),
+            if (gardens.length > 1)
+              GestureDetector(
+                onTap: () => deleteGarden(selectedGarden),
+                child: const Padding(
+                  padding: EdgeInsets.only(left: 8),
+                  child: Icon(Icons.close, size: 20, color: Colors.red),
+                ),
+              ),
+          ],
+        ),
         actions: [
-          IconButton(icon: const Icon(Icons.settings), onPressed: editEnvParams),
           IconButton(
-            icon: const Icon(Icons.delete),
-            onPressed: () => deleteGarden(selectedGarden),
+            icon: const Icon(Icons.settings),
+            onPressed: editEnvParams,
           ),
         ],
       ),
@@ -200,7 +228,6 @@ class _GardenScreenState extends State<GardenScreen> {
         padding: const EdgeInsets.all(12),
         child: Column(
           children: [
-            // Thông số môi trường từ biến toàn cục
             Card(
               child: Column(
                 children: [
@@ -219,7 +246,9 @@ class _GardenScreenState extends State<GardenScreen> {
             Expanded(
               child: ListView(
                 children: [
-                  ...garden.plants.asMap().entries.map((e) => buildPlantCard(e.value, e.key)),
+                  ...garden.plants.asMap().entries.map(
+                    (e) => buildPlantCard(e.value, e.key),
+                  ),
                   Card(
                     color: Colors.green[50],
                     child: ListTile(
@@ -239,11 +268,15 @@ class _GardenScreenState extends State<GardenScreen> {
           children: [
             for (int i = 0; i < gardens.length; i++)
               Expanded(
-                child: TextButton(
-                  onPressed: () => setState(() => selectedGarden = i),
-                  child: Text(
-                    gardens[i].name,
-                    style: TextStyle(color: i == selectedGarden ? Colors.green : Colors.black),
+                child: Center(
+                  child: TextButton(
+                    onPressed: () => setState(() => selectedGarden = i),
+                    child: Text(
+                      gardens[i].name,
+                      style: TextStyle(
+                        color: i == selectedGarden ? Colors.green : Colors.black,
+                      ),
+                    ),
                   ),
                 ),
               ),
