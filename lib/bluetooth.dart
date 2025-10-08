@@ -1,336 +1,187 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
-import 'dart:typed_data';
 import 'package:permission_handler/permission_handler.dart';
+import 'bluetooth_service.dart';
 
-Future<void> _checkBluetoothPermissions() async {
-  if (await Permission.bluetoothScan.isDenied) {
-    await Permission.bluetoothScan.request();
-  }
-  if (await Permission.bluetoothConnect.isDenied) {
-    await Permission.bluetoothConnect.request();
-  }
-  if (await Permission.bluetoothAdvertise.isDenied) {
-    await Permission.bluetoothAdvertise.request();
-  }
-  if (await Permission.location.isDenied) {
-    await Permission.location.request();
-  }
+Future<void> _checkPermissions() async {
+  await [
+    Permission.bluetoothScan,
+    Permission.bluetoothConnect,
+    Permission.bluetoothAdvertise,
+    Permission.location,
+  ].request();
 }
 
 class BluetoothScanPage extends StatefulWidget {
+  const BluetoothScanPage({super.key});
   @override
-  _BluetoothScanPageState createState() => _BluetoothScanPageState();
+  State<BluetoothScanPage> createState() => _BluetoothScanPageState();
 }
 
 class _BluetoothScanPageState extends State<BluetoothScanPage> {
-  BluetoothState _bluetoothState = BluetoothState.UNKNOWN;
+  BluetoothState _state = BluetoothState.UNKNOWN;
   List<BluetoothDiscoveryResult> _devices = [];
-  bool _isDiscovering = false;
-  BluetoothConnection? _connection;
-  BluetoothDevice? _connectedDevice;
+  bool _discovering = false;
+  BluetoothDevice? _connected;
 
   @override
   void initState() {
     super.initState();
-    _checkBluetoothPermissions(); // 🔹 Quan trọng: xin quyền ngay khi vào app
+    _checkPermissions();
     _initBluetooth();
   }
 
   Future<void> _initBluetooth() async {
-    try {
-      BluetoothState state = await FlutterBluetoothSerial.instance.state;
-      setState(() => _bluetoothState = state);
-
-      FlutterBluetoothSerial.instance.onStateChanged().listen((state) {
-        if (mounted) setState(() => _bluetoothState = state);
-      });
-    } catch (e) {
-      print("Lỗi khởi tạo Bluetooth: $e");
-    }
+    final s = await FlutterBluetoothSerial.instance.state;
+    setState(() => _state = s);
+    FlutterBluetoothSerial.instance.onStateChanged().listen((v) {
+      if (mounted) setState(() => _state = v);
+    });
   }
 
-  Future<void> _toggleBluetooth(bool enable) async {
-    if (enable) {
-      await FlutterBluetoothSerial.instance.requestEnable();
-    } else {
-      await FlutterBluetoothSerial.instance.requestDisable();
-    }
-  }
+  Future<void> _toggle(bool on) async => on
+      ? await FlutterBluetoothSerial.instance.requestEnable()
+      : await FlutterBluetoothSerial.instance.requestDisable();
 
-  Future<void> startDiscovery() async {
-    await _checkBluetoothPermissions(); // 🔹 Đảm bảo xin quyền trước khi quét
+  Future<void> _startDiscovery() async {
+    await _checkPermissions();
     setState(() {
       _devices.clear();
-      _isDiscovering = true;
+      _discovering = true;
     });
 
     FlutterBluetoothSerial.instance
         .startDiscovery()
-        .listen((result) {
+        .listen((r) {
           setState(() {
-            final existingIndex = _devices.indexWhere(
-              (element) => element.device.address == result.device.address,
+            final i = _devices.indexWhere(
+              (e) => e.device.address == r.device.address,
             );
-
-            if (existingIndex >= 0) {
-              _devices[existingIndex] = result;
-            } else {
-              _devices.add(result);
-            }
+            if (i >= 0)
+              _devices[i] = r;
+            else
+              _devices.add(r);
           });
         })
-        .onDone(() {
-          setState(() => _isDiscovering = false);
-        });
+        .onDone(() => setState(() => _discovering = false));
   }
 
-  Future<void> getBondedDevices() async {
-    try {
-      List<BluetoothDevice> bondedDevices = await FlutterBluetoothSerial
-          .instance
-          .getBondedDevices();
-
-      setState(() {
-        _devices = bondedDevices
-            .map((device) => BluetoothDiscoveryResult(device: device, rssi: 0))
-            .toList();
-      });
-    } catch (e) {
-      print("Lỗi lấy danh sách đã ghép nối: $e");
-    }
+  Future<void> _getBonded() async {
+    final list = await FlutterBluetoothSerial.instance.getBondedDevices();
+    setState(
+      () => _devices = list
+          .map((d) => BluetoothDiscoveryResult(device: d, rssi: 0))
+          .toList(),
+    );
   }
 
-  Future<void> connectToDevice(BluetoothDevice device) async {
+  Future<void> _connect(BluetoothDevice d) async {
     try {
-      BluetoothConnection connection = await BluetoothConnection.toAddress(
-        device.address,
-      );
-
+      final c = await BluetoothConnection.toAddress(d.address);
       if (!mounted) return;
-
-      setState(() {
-        _connection = connection;
-        _connectedDevice = device;
-      });
+      setState(() => _connected = d);
+      BluetoothService.instance.setConnection(c);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Đã kết nối với ${device.name ?? device.address}'),
-        ),
+        SnackBar(content: Text('Đã kết nối ${d.name ?? d.address}')),
       );
 
-      connection.input
-          ?.listen((Uint8List data) {
-            String received = String.fromCharCodes(data);
-            print('Nhận: $received');
-
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Nhận: $received'),
-                  duration: Duration(seconds: 1),
-                ),
-              );
-            }
+      c.input
+          ?.listen((data) {
+            final msg = String.fromCharCodes(data);
+            BluetoothService.instance.onReceive(msg);
           })
           .onDone(() {
-            if (mounted) {
-              setState(() {
-                _connection = null;
-                _connectedDevice = null;
-              });
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text('Đã ngắt kết nối')));
-            }
+            if (mounted) setState(() => _connected = null);
           });
     } catch (e) {
-      print("Lỗi kết nối: $e");
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Không thể kết nối: $e')));
+      ).showSnackBar(SnackBar(content: Text('Kết nối thất bại')));
     }
   }
 
-  void sendData(String text) {
-    if (_connection != null && _connection!.isConnected) {
-      _connection!.output.add(Uint8List.fromList(text.codeUnits));
-      _connection!.output.allSent.then((_) => print('Đã gửi: $text'));
-    }
-  }
-
-  Future<void> disconnect() async {
-    if (_connection != null) {
-      await _connection!.finish();
-      setState(() {
-        _connection = null;
-        _connectedDevice = null;
-      });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Đã ngắt kết nối')));
-    }
+  Future<void> _disconnect() async {
+    await BluetoothService.instance.disconnect();
+    setState(() => _connected = null);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Bluetooth Classic (HC-05)'),
+        title: const Text('Kết nối Bluetooth'),
         actions: [
           IconButton(
             icon: Icon(
-              _bluetoothState.isEnabled
+              _state.isEnabled
                   ? Icons.bluetooth_connected
                   : Icons.bluetooth_disabled,
             ),
-            onPressed: () => _toggleBluetooth(!_bluetoothState.isEnabled),
-            tooltip: _bluetoothState.isEnabled
-                ? 'Tắt Bluetooth'
-                : 'Bật Bluetooth',
+            onPressed: () => _toggle(!_state.isEnabled),
           ),
-          if (_connectedDevice != null)
-            IconButton(
-              icon: Icon(Icons.close),
-              onPressed: disconnect,
-              tooltip: 'Ngắt kết nối',
-            ),
+          if (_connected != null)
+            IconButton(icon: const Icon(Icons.close), onPressed: _disconnect),
         ],
       ),
       body: Column(
         children: [
-          if (_connectedDevice != null)
+          if (_connected != null)
             Container(
+              padding: const EdgeInsets.all(12),
               color: Colors.green.shade100,
-              padding: EdgeInsets.all(16),
-              child: Column(
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.bluetooth_connected, color: Colors.green),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Đã kết nối: ${_connectedDevice!.name ?? _connectedDevice!.address}',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      TextButton(onPressed: disconnect, child: Text('Ngắt')),
-                    ],
+                  const Icon(Icons.bluetooth_connected, color: Colors.green),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(_connected!.name ?? _connected!.address),
                   ),
-                  SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => sendData('1'),
-                          child: Text('Gửi: 1'),
-                        ),
-                      ),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => sendData('0'),
-                          child: Text('Gửi: 0'),
-                        ),
-                      ),
-                    ],
-                  ),
+                  TextButton(onPressed: _disconnect, child: const Text('Ngắt')),
                 ],
               ),
             ),
           Padding(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             child: Row(
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _isDiscovering ? null : startDiscovery,
-                    icon: Icon(
-                      _isDiscovering ? Icons.hourglass_empty : Icons.search,
-                    ),
-                    label: Text(
-                      _isDiscovering ? 'Đang quét...' : 'Quét thiết bị mới',
-                    ),
+                    onPressed: _discovering ? null : _startDiscovery,
+                    icon: const Icon(Icons.search),
+                    label: Text(_discovering ? 'Đang quét...' : 'Quét mới'),
                   ),
                 ),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: getBondedDevices,
-                    icon: Icon(Icons.devices),
-                    label: Text('Đã ghép nối'),
+                    onPressed: _getBonded,
+                    icon: const Icon(Icons.devices),
+                    label: const Text('Đã ghép nối'),
                   ),
                 ),
               ],
             ),
           ),
-          if (!_bluetoothState.isEnabled)
-            Container(
-              color: Colors.orange.shade100,
-              padding: EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(Icons.warning, color: Colors.orange),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text('Bluetooth đang tắt. Nhấn icon trên để bật.'),
-                  ),
-                ],
-              ),
-            ),
           Expanded(
             child: _devices.isEmpty
-                ? Center(
-                    child: Text(
-                      _isDiscovering
-                          ? 'Đang tìm kiếm thiết bị...'
-                          : 'Nhấn "Quét thiết bị mới" hoặc "Đã ghép nối"',
-                      style: TextStyle(color: Colors.grey),
-                      textAlign: TextAlign.center,
-                    ),
-                  )
+                ? const Center(child: Text('Không có thiết bị'))
                 : ListView.builder(
                     itemCount: _devices.length,
-                    itemBuilder: (context, index) {
-                      final result = _devices[index];
-                      final device = result.device;
-
-                      return Card(
-                        margin: EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
+                    itemBuilder: (_, i) {
+                      final d = _devices[i].device;
+                      return ListTile(
+                        leading: const Icon(
+                          Icons.bluetooth,
+                          color: Colors.blue,
                         ),
-                        child: ListTile(
-                          leading: Icon(
-                            Icons.bluetooth,
-                            color: Colors.blue,
-                            size: 36,
-                          ),
-                          title: Text(
-                            device.name ?? 'Thiết bị không tên',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Địa chỉ: ${device.address}'),
-                              if (result.rssi != 0)
-                                Text('RSSI: ${result.rssi} dBm'),
-                              if (device.isBonded)
-                                Text(
-                                  '✓ Đã ghép nối',
-                                  style: TextStyle(color: Colors.green),
-                                ),
-                            ],
-                          ),
-                          trailing: ElevatedButton(
-                            onPressed: _connection != null
-                                ? null
-                                : () => connectToDevice(device),
-                            child: Text('Kết nối'),
-                          ),
+                        title: Text(d.name ?? 'Không tên'),
+                        subtitle: Text(d.address),
+                        trailing: ElevatedButton(
+                          onPressed: _connected == null
+                              ? () => _connect(d)
+                              : null,
+                          child: const Text('Kết nối'),
                         ),
                       );
                     },
@@ -339,11 +190,5 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _connection?.dispose();
-    super.dispose();
   }
 }

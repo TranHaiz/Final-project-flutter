@@ -33,6 +33,7 @@ class GardenManager extends StatefulWidget {
 class _GardenManagerState extends State<GardenManager> {
   List<Garden> gardens = [];
   int selectedIndex = 0;
+  List<bool> switchStates = [false, false, false, false];
 
   @override
   void initState() {
@@ -118,115 +119,174 @@ class _GardenManagerState extends State<GardenManager> {
 
     final garden = gardens[selectedIndex];
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            Text(garden.name),
-            const SizedBox(width: 6),
-            if (gardens.length > 1)
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                icon: const Icon(Icons.close, color: Colors.red, size: 20),
-                onPressed: () => _removeGarden(selectedIndex),
-              ),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Row(
+            children: [
+              Text(garden.name),
+              const SizedBox(width: 6),
+              if (gardens.length > 1)
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  icon: const Icon(Icons.close, color: Colors.red, size: 20),
+                  onPressed: () => _removeGarden(selectedIndex),
+                ),
+            ],
+          ),
+          bottom: const TabBar(
+            tabs: [
+              Tab(icon: Icon(Icons.analytics), text: "Môi trường"),
+              Tab(icon: Icon(Icons.toggle_on), text: "Điều khiển"),
+            ],
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.bluetooth),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => BluetoothScanPage()),
+                );
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.logout, color: Colors.red),
+              onPressed: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                );
+              },
+            ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bluetooth),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => BluetoothScanPage()),
-              );
-            },
-          ),
+        body: TabBarView(
+          children: [
+            // TAB 1: hiển thị thông số môi trường + dữ liệu
+            Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: envParamsTypes.map((key) {
+                      final val = garden.envParams[key] ?? 0;
+                      IconData icon;
+                      Color color;
+                      if (key.contains("Nhiệt độ")) {
+                        icon = Icons.thermostat;
+                        color = Colors.orange;
+                      } else if (key.contains("Độ ẩm")) {
+                        icon = Icons.water_drop;
+                        color = Colors.blue;
+                      } else {
+                        icon = Icons.wb_sunny;
+                        color = Colors.yellow.shade700;
+                      }
+                      return Expanded(
+                        child: Card(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 4,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              children: [
+                                Icon(icon, size: 28, color: color),
+                                const SizedBox(height: 6),
+                                Text(
+                                  key,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "$val",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: color,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                Expanded(
+                  child: EnvDataGrid(
+                    envDatas: garden.envDatas,
+                    envDataTypes: envDataTypes,
+                    onAdd: _addEnvData,
+                    onDelete: _deleteEnvData,
+                  ),
+                ),
+              ],
+            ),
 
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.red),
-            onPressed: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-              );
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: envParamsTypes.map((key) {
-                final val = garden.envParams[key] ?? 0;
-                IconData icon;
-                Color color;
-                if (key.contains("Nhiệt độ")) {
-                  icon = Icons.thermostat;
-                  color = Colors.orange;
-                } else if (key.contains("Độ ẩm")) {
-                  icon = Icons.water_drop;
-                  color = Colors.blue;
-                } else {
-                  icon = Icons.wb_sunny;
-                  color = Colors.yellow.shade700;
-                }
-                return Expanded(
-                  child: Card(
+            // TAB 2: Điều khiển 4 switch
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: GridView.builder(
+                itemCount: 4,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 1.3,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemBuilder: (context, i) {
+                  return Card(
+                    elevation: 3,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    elevation: 4,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Column(
-                        children: [
-                          Icon(icon, size: 28, color: color),
-                          const SizedBox(height: 6),
-                          Text(
-                            key,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text("Thiết bị ${i + 1}",
                             style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
+                                fontSize: 16, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 10),
+                        Switch(
+                          value: switchStates[i],
+                          onChanged: (v) {
+                            setState(() => switchStates[i] = v);
+                          },
+                        ),
+                        Text(
+                          switchStates[i] ? "Bật" : "Tắt",
+                          style: TextStyle(
+                            color: switchStates[i]
+                                ? Colors.green
+                                : Colors.grey.shade700,
+                            fontWeight: FontWeight.w500,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            "$val",
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: color,
-                            ),
-                          ),
-                        ],
-                      ),
+                        )
+                      ],
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+                },
+              ),
             ),
-          ),
-          Expanded(
-            child: EnvDataGrid(
-              envDatas: garden.envDatas,
-              envDataTypes: envDataTypes,
-              onAdd: _addEnvData,
-              onDelete: _deleteEnvData,
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: GardenBottomNav(
-        gardens: gardens,
-        selectedIndex: selectedIndex,
-        maxGardens: maxGardens,
-        onSelect: (i) => setState(() => selectedIndex = i),
-        onAdd: _addGarden,
+          ],
+        ),
+        bottomNavigationBar: GardenBottomNav(
+          gardens: gardens,
+          selectedIndex: selectedIndex,
+          maxGardens: maxGardens,
+          onSelect: (i) => setState(() => selectedIndex = i),
+          onAdd: _addGarden,
+        ),
       ),
     );
   }
