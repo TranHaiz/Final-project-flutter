@@ -7,44 +7,29 @@ void main() {
   runApp(const MyApp());
 }
 
-// Dữ liệu cây
+// === Biến toàn cục cho thông số môi trường ===
+double temperature = 0;
+double humidity = 0;
+
 class Plant {
   String name;
   Plant({required this.name});
-
   Map<String, dynamic> toJson() => {"name": name};
-  factory Plant.fromJson(Map<String, dynamic> json) =>
-      Plant(name: json["name"]);
+  factory Plant.fromJson(Map<String, dynamic> json) => Plant(name: json["name"]);
 }
 
-// Dữ liệu vườn
 class Garden {
   String name;
   List<Plant> plants;
-  Map<String, double> envParams; // Ví dụ: nhiệt độ, độ ẩm
-
-  Garden({
-    required this.name,
-    List<Plant>? plants,
-    Map<String, double>? envParams,
-  }) : plants = plants ?? [],
-       envParams = envParams ?? {};
-
+  Garden({required this.name, List<Plant>? plants}) : plants = plants ?? [];
   Map<String, dynamic> toJson() => {
-    "name": name,
-    "plants": plants.map((p) => p.toJson()).toList(),
-    "envParams": envParams,
-  };
-
+        "name": name,
+        "plants": plants.map((p) => p.toJson()).toList(),
+      };
   factory Garden.fromJson(Map<String, dynamic> json) => Garden(
-    name: json["name"],
-    plants:
-        (json["plants"] as List<dynamic>?)
-            ?.map((p) => Plant.fromJson(p))
-            .toList() ??
-        [],
-    envParams: Map<String, double>.from(json["envParams"] ?? {}),
-  );
+        name: json["name"],
+        plants: (json["plants"] as List<dynamic>?)?.map((p) => Plant.fromJson(p)).toList() ?? [],
+      );
 }
 
 class MyApp extends StatelessWidget {
@@ -68,8 +53,8 @@ class GardenScreen extends StatefulWidget {
 class _GardenScreenState extends State<GardenScreen> {
   List<Garden> gardens = [];
   int selectedGarden = 0;
-
   final List<String> plantTypes = ["Xoài", "Táo", "Sầu riêng"];
+  final int maxGardens = 4;
 
   @override
   void initState() {
@@ -84,9 +69,7 @@ class _GardenScreenState extends State<GardenScreen> {
 
   Future<void> saveGardens() async {
     final file = await localFile;
-    await file.writeAsString(
-      jsonEncode(gardens.map((g) => g.toJson()).toList()),
-    );
+    await file.writeAsString(jsonEncode(gardens.map((g) => g.toJson()).toList()));
   }
 
   Future<void> loadGardens() async {
@@ -97,17 +80,28 @@ class _GardenScreenState extends State<GardenScreen> {
         gardens = (data as List).map((g) => Garden.fromJson(g)).toList();
       });
     } else {
-      setState(() {
-        gardens = [Garden(name: "Vườn 1")];
-      });
+      setState(() => gardens = [Garden(name: "Vườn 1")]);
       saveGardens();
     }
   }
 
   void addGarden() {
+    if (gardens.length >= maxGardens) return; // Giới hạn 4 vườn
     setState(() {
       gardens.add(Garden(name: "Vườn ${gardens.length + 1}"));
       selectedGarden = gardens.length - 1;
+    });
+    saveGardens();
+  }
+
+  void deleteGarden(int index) {
+    setState(() {
+      gardens.removeAt(index);
+      // Cập nhật lại tên vườn để đúng số thứ tự
+      for (int i = 0; i < gardens.length; i++) {
+        gardens[i].name = "Vườn ${i + 1}";
+      }
+      selectedGarden = gardens.isEmpty ? 0 : (index == 0 ? 0 : index - 1);
     });
     saveGardens();
   }
@@ -125,31 +119,28 @@ class _GardenScreenState extends State<GardenScreen> {
       builder: (_) => SimpleDialog(
         title: const Text("Chọn cây"),
         children: plantTypes
-            .map(
-              (p) => SimpleDialogOption(
-                onPressed: () {
-                  setState(() {
-                    gardens[selectedGarden].plants.add(Plant(name: p));
-                  });
-                  saveGardens();
-                  Navigator.pop(context);
-                },
-                child: Text(p),
-              ),
-            )
+            .map((p) => SimpleDialogOption(
+                  onPressed: () {
+                    setState(() => gardens[selectedGarden].plants.add(Plant(name: p)));
+                    saveGardens();
+                    Navigator.pop(context);
+                  },
+                  child: Row(
+                    children: [
+                      const Icon(Icons.local_florist, color: Colors.green),
+                      const SizedBox(width: 8),
+                      Text(p),
+                    ],
+                  ),
+                ))
             .toList(),
       ),
     );
   }
 
   void editEnvParams() {
-    final garden = gardens[selectedGarden];
-    final tempController = TextEditingController(
-      text: garden.envParams["Nhiệt độ"]?.toString() ?? "",
-    );
-    final humidityController = TextEditingController(
-      text: garden.envParams["Độ ẩm"]?.toString() ?? "",
-    );
+    final tempController = TextEditingController(text: temperature.toString());
+    final humidityController = TextEditingController(text: humidity.toString());
 
     showDialog(
       context: context,
@@ -158,26 +149,17 @@ class _GardenScreenState extends State<GardenScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
-              controller: tempController,
-              decoration: const InputDecoration(labelText: "Nhiệt độ"),
-            ),
-            TextField(
-              controller: humidityController,
-              decoration: const InputDecoration(labelText: "Độ ẩm"),
-            ),
+            TextField(controller: tempController, decoration: const InputDecoration(labelText: "Nhiệt độ")),
+            TextField(controller: humidityController, decoration: const InputDecoration(labelText: "Độ ẩm")),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () {
               setState(() {
-                garden.envParams["Nhiệt độ"] =
-                    double.tryParse(tempController.text) ?? 0;
-                garden.envParams["Độ ẩm"] =
-                    double.tryParse(humidityController.text) ?? 0;
+                temperature = double.tryParse(tempController.text) ?? 0;
+                humidity = double.tryParse(humidityController.text) ?? 0;
               });
-              saveGardens();
               Navigator.pop(context);
             },
             child: const Text("Lưu"),
@@ -187,45 +169,70 @@ class _GardenScreenState extends State<GardenScreen> {
     );
   }
 
+  Widget buildPlantCard(Plant plant, int index) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ListTile(
+        leading: const Icon(Icons.local_florist, color: Colors.green),
+        title: Text(plant.name),
+        trailing: IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => deletePlant(index)),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (gardens.isEmpty)
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-
+    if (gardens.isEmpty) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     final garden = gardens[selectedGarden];
 
     return Scaffold(
       appBar: AppBar(
         title: Text(garden.name),
         actions: [
+          IconButton(icon: const Icon(Icons.settings), onPressed: editEnvParams),
           IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: editEnvParams,
+            icon: const Icon(Icons.delete),
+            onPressed: () => deleteGarden(selectedGarden),
           ),
         ],
       ),
-      body: ListView(
+      body: Padding(
         padding: const EdgeInsets.all(12),
-        children: [
-          // Hiển thị thông số môi trường
-          if (garden.envParams.isNotEmpty)
-            ...garden.envParams.entries.map(
-              (e) => ListTile(title: Text("${e.key}: ${e.value}")),
-            ),
-          const SizedBox(height: 12),
-          // Hiển thị danh sách cây
-          ...garden.plants.map(
-            (p) => ListTile(
-              title: Text(p.name),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete),
-                onPressed: () => deletePlant(garden.plants.indexOf(p)),
+        child: Column(
+          children: [
+            // Thông số môi trường từ biến toàn cục
+            Card(
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.thermostat, color: Colors.orange),
+                    title: Text("Nhiệt độ: $temperature"),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.water_drop, color: Colors.blue),
+                    title: Text("Độ ẩm: $humidity"),
+                  ),
+                ],
               ),
             ),
-          ),
-          // Nút thêm cây
-          ListTile(title: const Text("➕ Thêm cây"), onTap: addPlant),
-        ],
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListView(
+                children: [
+                  ...garden.plants.asMap().entries.map((e) => buildPlantCard(e.value, e.key)),
+                  Card(
+                    color: Colors.green[50],
+                    child: ListTile(
+                      leading: const Icon(Icons.add, color: Colors.green),
+                      title: const Text("Thêm cây"),
+                      onTap: addPlant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
       bottomNavigationBar: BottomAppBar(
         child: Row(
@@ -236,13 +243,15 @@ class _GardenScreenState extends State<GardenScreen> {
                   onPressed: () => setState(() => selectedGarden = i),
                   child: Text(
                     gardens[i].name,
-                    style: TextStyle(
-                      color: i == selectedGarden ? Colors.green : Colors.black,
-                    ),
+                    style: TextStyle(color: i == selectedGarden ? Colors.green : Colors.black),
                   ),
                 ),
               ),
-            TextButton(onPressed: addGarden, child: const Text("➕ Thêm vườn")),
+            if (gardens.length < maxGardens)
+              TextButton(
+                onPressed: addGarden,
+                child: const Text("➕ Thêm vườn"),
+              ),
           ],
         ),
       ),
