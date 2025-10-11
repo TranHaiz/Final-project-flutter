@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'login_screen.dart';
 
 // ============================= Constants =============================
 final List<String> plantTypes = ["Xoài", "Táo", "Sầu riêng"];
@@ -20,6 +21,7 @@ const int maxGardens = 4;
 // =========================== Public Variables ========================
 double temperature = 0;
 double humidity = 0;
+double lux = 0;
 
 // ============================== Classes ==============================
 class Plant {
@@ -149,6 +151,7 @@ class _GardenScreenState extends State<GardenScreen> {
   void editEnvParams() {
     final tempController = TextEditingController(text: temperature.toString());
     final humidityController = TextEditingController(text: humidity.toString());
+    final luxController = TextEditingController(text: lux.toString());
 
     showDialog(
       context: context,
@@ -165,6 +168,10 @@ class _GardenScreenState extends State<GardenScreen> {
               controller: humidityController,
               decoration: const InputDecoration(labelText: "Độ ẩm"),
             ),
+            TextField(
+              controller: luxController,
+              decoration: const InputDecoration(labelText: "Ánh sáng"),
+            ),
           ],
         ),
         actions: [
@@ -173,6 +180,7 @@ class _GardenScreenState extends State<GardenScreen> {
               setState(() {
                 temperature = double.tryParse(tempController.text) ?? 0;
                 humidity = double.tryParse(humidityController.text) ?? 0;
+                lux = double.tryParse(luxController.text) ?? 0;
               });
               Navigator.pop(context);
             },
@@ -213,11 +221,18 @@ class _GardenScreenState extends State<GardenScreen> {
         children: [
           ListTile(
             leading: const Icon(Icons.thermostat, color: Colors.orange),
-            title: Text("Nhiệt độ: $temperature"),
+            title: Text("Nhiệt độ: $temperature (ºC)"),
           ),
           ListTile(
             leading: const Icon(Icons.water_drop, color: Colors.blue),
-            title: Text("Độ ẩm: $humidity"),
+            title: Text("Độ ẩm: $humidity (%)"),
+          ),
+          ListTile(
+            leading: const Icon(
+              Icons.brightness_low_outlined,
+              color: Color.fromARGB(255, 240, 243, 73),
+            ),
+            title: Text("Cường độ sáng: $lux (lux)"),
           ),
         ],
       ),
@@ -262,6 +277,19 @@ class _GardenScreenState extends State<GardenScreen> {
       ),
       actions: [
         IconButton(icon: const Icon(Icons.settings), onPressed: editEnvParams),
+        IconButton(
+          icon: const Icon(
+            Icons.output_outlined,
+            color: Color.fromARGB(255, 240, 80, 69),
+          ),
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const LoginScreen()),
+            );
+          },
+        ),
+        const SizedBox(width: 10),
       ],
     );
   }
