@@ -1,293 +1,318 @@
-// lib/garden_manager.dart
-// Màn hình quản lý vườn: hiển thị thông số môi trường, quản lý cây và vườn
-
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'data_types.dart';
-import 'garden_storage.dart';
-import 'env_data_grid.dart';
-import 'garden_bottom_nav.dart';
-import 'login_screen.dart';
-import 'bluetooth.dart';
+import 'package:path_provider/path_provider.dart';
 
-final int maxGardens = 4;
-
-final Map<String, String> envDataTypes = {
-  "Xoài": "assets/xoai.png",
-  "Táo": "assets/apple.png",
-  "Sầu riêng": "assets/saurieng.png",
+// ============================= Constants =============================
+final List<String> plantTypes = ["Xoài", "Táo", "Sầu riêng"];
+final Map<String, IconData> plantIcons = {
+  "Xoài": Icons.eco,
+  "Táo": Icons.apple,
+  "Sầu riêng": Icons.forest,
 };
+final Map<String, Color> plantColors = {
+  "Xoài": Colors.yellow.shade700,
+  "Táo": Colors.redAccent,
+  "Sầu riêng": Colors.green.shade700,
+};
+const int maxGardens = 4;
 
-final List<String> envParamsTypes = [
-  "Nhiệt độ (°C)",
-  "Độ ẩm (%)",
-  "Ánh sáng (lux)",
-];
+// =========================== Public Variables ========================
+double temperature = 0;
+double humidity = 0;
 
-class GardenManager extends StatefulWidget {
-  const GardenManager({super.key});
+// ============================== Classes ==============================
+class Plant {
+  String name;
+  Plant({required this.name});
 
-  @override
-  State<GardenManager> createState() => _GardenManagerState();
+  Map<String, dynamic> toJson() => {"name": name};
+  factory Plant.fromJson(Map<String, dynamic> json) =>
+      Plant(name: json["name"]);
 }
 
-class _GardenManagerState extends State<GardenManager> {
+class Garden {
+  String name;
+  List<Plant> plants;
+  Garden({required this.name, List<Plant>? plants}) : plants = plants ?? [];
+
+  Map<String, dynamic> toJson() => {
+    "name": name,
+    "plants": plants.map((p) => p.toJson()).toList(),
+  };
+
+  factory Garden.fromJson(Map<String, dynamic> json) => Garden(
+    name: json["name"],
+    plants:
+        (json["plants"] as List<dynamic>?)
+            ?.map((p) => Plant.fromJson(p))
+            .toList() ??
+        [],
+  );
+}
+
+// ============================== Garden Screen ==============================
+class GardenScreen extends StatefulWidget {
+  const GardenScreen({super.key});
+  @override
+  State<GardenScreen> createState() => _GardenScreenState();
+}
+
+class _GardenScreenState extends State<GardenScreen> {
   List<Garden> gardens = [];
-  int selectedIndex = 0;
-  List<bool> switchStates = [false, false, false, false];
+  int selectedGarden = 0;
+
+  // ========================== Local Functions ==========================
+  Future<File> get localFile async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File("${dir.path}/gardens.json");
+  }
+
+  Future<void> saveGardens() async {
+    final file = await localFile;
+    await file.writeAsString(
+      jsonEncode(gardens.map((g) => g.toJson()).toList()),
+    );
+  }
+
+  Future<void> loadGardens() async {
+    final file = await localFile;
+    if (await file.exists()) {
+      final data = jsonDecode(await file.readAsString());
+      setState(() {
+        gardens = (data as List).map((g) => Garden.fromJson(g)).toList();
+      });
+    } else {
+      setState(() => gardens = [Garden(name: "Vườn 1")]);
+      saveGardens();
+    }
+  }
+
+  // === Các thao tác quản lý dữ liệu ===
+  void addGarden() {
+    if (gardens.length >= maxGardens) return;
+    setState(() {
+      gardens.add(Garden(name: "Vườn ${gardens.length + 1}"));
+      selectedGarden = gardens.length - 1;
+    });
+    saveGardens();
+  }
+
+  void deleteGarden(int index) {
+    setState(() {
+      gardens.removeAt(index);
+      for (int i = 0; i < gardens.length; i++) {
+        gardens[i].name = "Vườn ${i + 1}";
+      }
+      selectedGarden = gardens.isEmpty ? 0 : (index == 0 ? 0 : index - 1);
+    });
+    saveGardens();
+  }
+
+  void deletePlant(int index) {
+    setState(() {
+      gardens[selectedGarden].plants.removeAt(index);
+    });
+    saveGardens();
+  }
+
+  void addPlant() {
+    showDialog(
+      context: context,
+      builder: (_) => SimpleDialog(
+        title: const Text("Chọn cây"),
+        children: plantTypes.map((p) {
+          return SimpleDialogOption(
+            onPressed: () {
+              setState(
+                () => gardens[selectedGarden].plants.add(Plant(name: p)),
+              );
+              saveGardens();
+              Navigator.pop(context);
+            },
+            child: Row(
+              children: [
+                Icon(
+                  plantIcons[p] ?? Icons.local_florist,
+                  color: plantColors[p] ?? Colors.green,
+                ),
+                const SizedBox(width: 8),
+                Text(p),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  void editEnvParams() {
+    final tempController = TextEditingController(text: temperature.toString());
+    final humidityController = TextEditingController(text: humidity.toString());
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Chỉnh thông số"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: tempController,
+              decoration: const InputDecoration(labelText: "Nhiệt độ"),
+            ),
+            TextField(
+              controller: humidityController,
+              decoration: const InputDecoration(labelText: "Độ ẩm"),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              setState(() {
+                temperature = double.tryParse(tempController.text) ?? 0;
+                humidity = double.tryParse(humidityController.text) ?? 0;
+              });
+              Navigator.pop(context);
+            },
+            child: const Text("Lưu"),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void initState() {
     super.initState();
-    _loadGardens();
+    loadGardens();
   }
 
-  Future<void> _loadGardens() async {
-    final data = await GardenStorage.loadGardens();
-    setState(() {
-      gardens = data;
-      for (var g in gardens) {
-        for (var key in envParamsTypes) {
-          g.envParams.putIfAbsent(key, () => 0);
-        }
-      }
-    });
-  }
-
-  Future<void> _saveGardens() async => await GardenStorage.saveGardens(gardens);
-
-  void _addGarden() {
-    if (gardens.length >= maxGardens) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Số lượng vườn đã đạt tối đa")),
-      );
-      return;
-    }
-    setState(() {
-      gardens.add(
-        Garden(
-          name: "Vườn ${gardens.length + 1}",
-          envParams: {for (var k in envParamsTypes) k: 0},
+  // === Các Widget con ===
+  Widget buildPlantCard(Plant plant, int index) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ListTile(
+        leading: Icon(
+          plantIcons[plant.name] ?? Icons.local_florist,
+          color: plantColors[plant.name] ?? Colors.green,
         ),
-      );
-      selectedIndex = gardens.length - 1;
-    });
-    _saveGardens();
+        title: Text(plant.name),
+        trailing: IconButton(
+          icon: const Icon(Icons.delete, color: Colors.red),
+          onPressed: () => deletePlant(index),
+        ),
+      ),
+    );
   }
 
-  void _removeGarden(int index) {
-    if (gardens.length <= 1) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text("Phải có ít nhất 1 vườn")));
-      return;
-    }
-    setState(() {
-      gardens.removeAt(index);
-      if (selectedIndex >= gardens.length) selectedIndex = gardens.length - 1;
-      for (int i = 0; i < gardens.length; i++) {
-        gardens[i].name = "Vườn ${i + 1}";
-      }
-    });
-    _saveGardens();
+  Widget buildEnvInfoCard() {
+    return Card(
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.thermostat, color: Colors.orange),
+            title: Text("Nhiệt độ: $temperature"),
+          ),
+          ListTile(
+            leading: const Icon(Icons.water_drop, color: Colors.blue),
+            title: Text("Độ ẩm: $humidity"),
+          ),
+        ],
+      ),
+    );
   }
 
-  void _addEnvData(EnvData envData) {
-    setState(() => gardens[selectedIndex].envDatas.add(envData));
-    _saveGardens();
+  Widget buildPlantList(Garden garden) {
+    return Expanded(
+      child: ListView(
+        children: [
+          ...garden.plants.asMap().entries.map(
+            (e) => buildPlantCard(e.value, e.key),
+          ),
+          Card(
+            color: Colors.green[50],
+            child: ListTile(
+              leading: const Icon(Icons.add, color: Colors.green),
+              title: const Text("Thêm cây"),
+              onTap: addPlant,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  void _deleteEnvData(int index) {
-    setState(() => gardens[selectedIndex].envDatas.removeAt(index));
-    _saveGardens();
+  // === Thanh điều hướng ===
+  PreferredSizeWidget buildAppBar(Garden garden) {
+    return AppBar(
+      title: Row(
+        children: [
+          Text(garden.name),
+          if (gardens.length > 1)
+            GestureDetector(
+              onTap: () => deleteGarden(selectedGarden),
+              child: const Padding(
+                padding: EdgeInsets.only(left: 8),
+                child: Icon(Icons.close, size: 20, color: Colors.red),
+              ),
+            ),
+        ],
+      ),
+      actions: [
+        IconButton(icon: const Icon(Icons.settings), onPressed: editEnvParams),
+      ],
+    );
   }
 
-  void updateEnvParams(Map<String, double> newData) {
-    setState(() {
-      final garden = gardens[selectedIndex];
-      for (var key in envParamsTypes) {
-        garden.envParams[key] = newData[key] ?? 0;
-      }
-    });
-    _saveGardens();
+  Widget buildBottomNav() {
+    return BottomAppBar(
+      child: Row(
+        children: [
+          for (int i = 0; i < gardens.length; i++)
+            Expanded(
+              child: Center(
+                child: TextButton(
+                  onPressed: () => setState(() => selectedGarden = i),
+                  child: Text(
+                    gardens[i].name,
+                    style: TextStyle(
+                      color: i == selectedGarden ? Colors.green : Colors.black,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (gardens.length < maxGardens)
+            TextButton(onPressed: addGarden, child: const Text("➕ Thêm vườn")),
+        ],
+      ),
+    );
   }
 
+  // === Build UI chính ===
   @override
   Widget build(BuildContext context) {
     if (gardens.isEmpty) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final garden = gardens[selectedIndex];
+    final garden = gardens[selectedGarden];
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Row(
-            children: [
-              Text(garden.name),
-              const SizedBox(width: 6),
-              if (gardens.length > 1)
-                IconButton(
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  icon: const Icon(Icons.close, color: Colors.red, size: 20),
-                  onPressed: () => _removeGarden(selectedIndex),
-                ),
-            ],
-          ),
-          bottom: const TabBar(
-            tabs: [
-              Tab(icon: Icon(Icons.analytics), text: "Môi trường"),
-              Tab(icon: Icon(Icons.toggle_on), text: "Điều khiển"),
-            ],
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.bluetooth),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => BluetoothScanPage()),
-                );
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.logout, color: Colors.red),
-              onPressed: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
-              },
-            ),
-          ],
-        ),
-        body: TabBarView(
+    return Scaffold(
+      appBar: buildAppBar(garden),
+      body: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
           children: [
-            // TAB 1: hiển thị thông số môi trường + dữ liệu
-            Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: envParamsTypes.map((key) {
-                      final val = garden.envParams[key] ?? 0;
-                      IconData icon;
-                      Color color;
-                      if (key.contains("Nhiệt độ")) {
-                        icon = Icons.thermostat;
-                        color = Colors.orange;
-                      } else if (key.contains("Độ ẩm")) {
-                        icon = Icons.water_drop;
-                        color = Colors.blue;
-                      } else {
-                        icon = Icons.wb_sunny;
-                        color = Colors.yellow.shade700;
-                      }
-                      return Expanded(
-                        child: Card(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          elevation: 4,
-                          child: Padding(
-                            padding: const EdgeInsets.all(12.0),
-                            child: Column(
-                              children: [
-                                Icon(icon, size: 28, color: color),
-                                const SizedBox(height: 6),
-                                Text(
-                                  key,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  "$val",
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: color,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-                Expanded(
-                  child: EnvDataGrid(
-                    envDatas: garden.envDatas,
-                    envDataTypes: envDataTypes,
-                    onAdd: _addEnvData,
-                    onDelete: _deleteEnvData,
-                  ),
-                ),
-              ],
-            ),
-
-            // TAB 2: Điều khiển 4 switch
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: GridView.builder(
-                itemCount: 4,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  childAspectRatio: 1.3,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                ),
-                itemBuilder: (context, i) {
-                  return Card(
-                    elevation: 3,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text("Thiết bị ${i + 1}",
-                            style: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 10),
-                        Switch(
-                          value: switchStates[i],
-                          onChanged: (v) {
-                            setState(() => switchStates[i] = v);
-                          },
-                        ),
-                        Text(
-                          switchStates[i] ? "Bật" : "Tắt",
-                          style: TextStyle(
-                            color: switchStates[i]
-                                ? Colors.green
-                                : Colors.grey.shade700,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        )
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
+            buildEnvInfoCard(),
+            const SizedBox(height: 12),
+            buildPlantList(garden),
           ],
-        ),
-        bottomNavigationBar: GardenBottomNav(
-          gardens: gardens,
-          selectedIndex: selectedIndex,
-          maxGardens: maxGardens,
-          onSelect: (i) => setState(() => selectedIndex = i),
-          onAdd: _addGarden,
         ),
       ),
+      bottomNavigationBar: buildBottomNav(),
     );
   }
 }

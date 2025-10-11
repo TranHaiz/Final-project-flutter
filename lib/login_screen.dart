@@ -22,7 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordController.text == hardPassword) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const GardenManager()),
+        MaterialPageRoute(builder: (context) => const GardenScreen()),
       );
     } else {
       setState(() {
