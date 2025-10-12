@@ -82,6 +82,7 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
     try {
       final c = await BluetoothConnection.toAddress(d.address);
       BluetoothService.instance.setConnection(c, d);
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Đã kết nối ${d.name ?? d.address}')),
       );
@@ -91,7 +92,7 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
         BluetoothService.instance.onReceive(msg);
       });
 
-      setState(() {}); // Cập nhật UI
+      setState(() {});
     } catch (_) {
       ScaffoldMessenger.of(
         context,
@@ -106,7 +107,8 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
 
   Widget _buildDeviceTile(BluetoothDiscoveryResult r) {
     final d = r.device;
-    final connected = BluetoothService.instance.isConnected(d);
+    final connected =
+        BluetoothService.instance.currentDevice?.address == d.address;
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: ListTile(
@@ -119,7 +121,7 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
                 onPressed: _disconnect,
               )
             : ElevatedButton(
-                onPressed: !BluetoothService.instance.hasConnection
+                onPressed: BluetoothService.instance.currentDevice == null
                     ? () => _connect(d)
                     : null,
                 child: const Text('Kết nối'),
