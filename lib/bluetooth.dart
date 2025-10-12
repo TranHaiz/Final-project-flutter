@@ -1,20 +1,72 @@
 // @file       bluetooth.dart
 // @copyright  Copyright (C) 2025 Your_Organization. All rights reserved.
-// @license    This project is released under the MIT License.
+// @license    MIT License
 // @version    1.0.0
 // @date       2025-10-12
 // @author     Tran Hai
 // @brief      Handles Bluetooth scanning, connection, and data communication for the Garden Smart Home app.
 // @note       Uses Flutter Bluetooth Serial and Permission Handler to discover devices, manage connections, and receive data.
 
-// ============================== Imports ==============================
 import 'package:flutter/material.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'bluetooth_service.dart';
 import 'garden_manager.dart';
 
-// ========================== Local Functions ==========================
+List<double> latestValues = [0]; // lưu dữ liệu MCU gửi lên
+
+// ========================== Bluetooth Service ==========================
+class BluetoothService {
+  BluetoothConnection? _connection;
+  BluetoothDevice? _currentDevice;
+
+  static final BluetoothService instance = BluetoothService._internal();
+  BluetoothService._internal();
+
+  BluetoothDevice? get currentDevice => _currentDevice;
+  bool get hasConnection => _connection != null && _connection!.isConnected;
+
+  void setConnection(BluetoothConnection c, [BluetoothDevice? device]) {
+    _connection = c;
+    if (device != null) _currentDevice = device;
+  }
+
+  bool isConnected(BluetoothDevice d) {
+    return _currentDevice?.address == d.address && hasConnection;
+  }
+
+  Future<void> disconnect() async {
+    await _connection?.close();
+    _connection = null;
+    _currentDevice = null;
+  }
+
+  // Listener dữ liệu MCU
+  void startListening(void Function(List<double>) onData) {
+    if (_connection == null) return;
+
+    _connection!.input?.listen((data) {
+      final msg = String.fromCharCodes(data);
+      final lines = msg.split('\n');
+      for (var line in lines) {
+        if (line.isNotEmpty) {
+          final numbers = line
+              .split(',')
+              .map((e) => e.trim())
+              .where((e) => e.isNotEmpty)
+              .map((e) => double.tryParse(e))
+              .where((e) => e != null)
+              .map((e) => e!)
+              .toList();
+          if (numbers.isNotEmpty) {
+            onData(numbers);
+          }
+        }
+      }
+    });
+  }
+}
+
+// ========================== Permission Helper ==========================
 Future<void> _checkPermissions() async {
   await [
     Permission.bluetoothScan,
@@ -24,7 +76,7 @@ Future<void> _checkPermissions() async {
   ].request();
 }
 
-// ============================== Classes ==============================
+// ========================== Bluetooth Page ==========================
 class BluetoothScanPage extends StatefulWidget {
   const BluetoothScanPage({super.key});
 
@@ -33,12 +85,10 @@ class BluetoothScanPage extends StatefulWidget {
 }
 
 class _BluetoothScanPageState extends State<BluetoothScanPage> {
-  // ========================== Local Variables ==========================
   BluetoothState _state = BluetoothState.UNKNOWN;
   List<BluetoothDiscoveryResult> _devices = [];
   bool _discovering = false;
 
-  // === Init
   @override
   void initState() {
     super.initState();
@@ -46,7 +96,6 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
     _initBluetooth();
   }
 
-  // ========================== Local Functions ==========================
   Future<void> _initBluetooth() async {
     final s = await FlutterBluetoothSerial.instance.state;
     setState(() => _state = s);
@@ -102,12 +151,14 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
         SnackBar(content: Text('Đã kết nối ${d.name ?? d.address}')),
       );
 
-      c.input?.listen((data) {
-        final msg = String.fromCharCodes(data);
-        BluetoothService.instance.onReceive(msg);
+      // Bật listener tự động cập nhật latestValues
+      BluetoothService.instance.startListening((numbers) {
+        setState(() {
+          latestValues = numbers;
+        });
       });
 
-      setState(() {});
+      setState(() {}); // cập nhật UI
     } catch (_) {
       ScaffoldMessenger.of(
         context,
@@ -120,8 +171,6 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
     setState(() {});
   }
 
-  // ============================== Widget ===============================
-  // === Sub widget
   Widget _buildDeviceTile(BluetoothDiscoveryResult r) {
     final d = r.device;
     final connected =
@@ -147,7 +196,7 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
     );
   }
 
-  PreferredSizeWidget buildAppBar_Bluetooth() {
+  PreferredSizeWidget buildAppBar() {
     return AppBar(
       title: const Text('Bluetooth'),
       actions: [
@@ -172,11 +221,10 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
     );
   }
 
-  // === Main widget
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: buildAppBar_Bluetooth(),
+      appBar: buildAppBar(),
       body: Column(
         children: [
           if (BluetoothService.instance.currentDevice != null)

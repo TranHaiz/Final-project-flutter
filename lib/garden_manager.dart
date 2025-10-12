@@ -24,6 +24,8 @@ double temperature = 0;
 double humidity = 0;
 double lux = 0;
 
+List<double> latestValues = [0];
+
 // ============================== Classes ==============================
 class Plant {
   String name;
