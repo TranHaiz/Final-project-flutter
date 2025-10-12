@@ -10,6 +10,18 @@ A mobile application for smart garden management — allowing users to log in, m
 
 ## 📝 Release Notes
 
+### [2.0.0]
+
+#### Added
+
+- Update receive data from MCU
+
+### [2.0.0]
+
+#### Added
+
+- Basic UI
+
 ### [1.0.1]
 
 #### Added
