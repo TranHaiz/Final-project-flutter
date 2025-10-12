@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'login_screen.dart';
+import 'bluetooth.dart';
 
 // ============================= Constants =============================
 final List<String> plantTypes = ["Xoài", "Táo", "Sầu riêng"];
@@ -275,8 +276,25 @@ class _GardenScreenState extends State<GardenScreen> {
             ),
         ],
       ),
+      // === Icon on Appbar
       actions: [
         IconButton(icon: const Icon(Icons.settings), onPressed: editEnvParams),
+        // Bluetooth
+        IconButton(
+          icon: const Icon(
+            Icons.bluetooth_connected,
+            color: Color.fromARGB(255, 13, 166, 236),
+          ),
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const BluetoothScanPage(),
+              ),
+            );
+          },
+        ),
+        // Logout
         IconButton(
           icon: const Icon(
             Icons.output_outlined,
@@ -289,7 +307,7 @@ class _GardenScreenState extends State<GardenScreen> {
             );
           },
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 20),
       ],
     );
   }
