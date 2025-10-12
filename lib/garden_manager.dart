@@ -13,9 +13,9 @@ final Map<String, IconData> plantIcons = {
   "Sầu riêng": Icons.forest,
 };
 final Map<String, Color> plantColors = {
-  "Xoài": Colors.yellow.shade700,
+  "Xoài": Colors.yellow,
   "Táo": Colors.redAccent,
-  "Sầu riêng": Colors.green.shade700,
+  "Sầu riêng": Colors.green,
 };
 const int maxGardens = 4;
 
@@ -113,12 +113,14 @@ class _GardenScreenState extends State<GardenScreen> {
   }
 
   void deleteGarden(int index) {
+    if (gardens.length == 1) return;
+
     setState(() {
       gardens.removeAt(index);
       for (int i = 0; i < gardens.length; i++) {
         gardens[i].name = "Vườn ${i + 1}";
       }
-      selectedGarden = gardens.isEmpty ? 0 : (index == 0 ? 0 : index - 1);
+      selectedGarden = selectedGarden > 0 ? selectedGarden - 1 : 0;
     });
     saveGardens();
   }
@@ -156,49 +158,6 @@ class _GardenScreenState extends State<GardenScreen> {
             ),
           );
         }).toList(),
-      ),
-    );
-  }
-
-  void editEnvParams() {
-    final tCtrl = TextEditingController(text: temperature.toString());
-    final hCtrl = TextEditingController(text: humidity.toString());
-    final lCtrl = TextEditingController(text: lux.toString());
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Chỉnh thông số"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: tCtrl,
-              decoration: const InputDecoration(labelText: "Nhiệt độ"),
-            ),
-            TextField(
-              controller: hCtrl,
-              decoration: const InputDecoration(labelText: "Độ ẩm"),
-            ),
-            TextField(
-              controller: lCtrl,
-              decoration: const InputDecoration(labelText: "Ánh sáng"),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              setState(() {
-                temperature = double.tryParse(tCtrl.text) ?? 0;
-                humidity = double.tryParse(hCtrl.text) ?? 0;
-                lux = double.tryParse(lCtrl.text) ?? 0;
-              });
-              Navigator.pop(context);
-            },
-            child: const Text("Lưu"),
-          ),
-        ],
       ),
     );
   }
@@ -264,7 +223,7 @@ class _GardenScreenState extends State<GardenScreen> {
     return AppBar(
       title: Text(garden.name),
       actions: [
-        IconButton(icon: const Icon(Icons.settings), onPressed: editEnvParams),
+        // === Bluetooth
         IconButton(
           icon: const Icon(Icons.bluetooth_connected, color: Colors.blue),
           onPressed: () => Navigator.pushReplacement(
@@ -272,6 +231,12 @@ class _GardenScreenState extends State<GardenScreen> {
             MaterialPageRoute(builder: (_) => const BluetoothScanPage()),
           ),
         ),
+        // ==== Delete garden
+        IconButton(
+          icon: const Icon(Icons.close, color: Colors.red),
+          onPressed: () => deleteGarden(selectedGarden),
+        ),
+        // === Logout
         IconButton(
           icon: const Icon(Icons.logout, color: Colors.red),
           onPressed: () => Navigator.pushReplacement(
