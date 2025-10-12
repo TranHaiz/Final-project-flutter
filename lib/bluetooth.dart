@@ -1,9 +1,20 @@
+// @file       bluetooth.dart
+// @copyright  Copyright (C) 2025 Your_Organization. All rights reserved.
+// @license    This project is released under the MIT License.
+// @version    1.0.0
+// @date       2025-10-12
+// @author     Tran Hai
+// @brief      Handles Bluetooth scanning, connection, and data communication for the Garden Smart Home app.
+// @note       Uses Flutter Bluetooth Serial and Permission Handler to discover devices, manage connections, and receive data.
+
+// ============================== Imports ==============================
 import 'package:flutter/material.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'bluetooth_service.dart';
 import 'garden_manager.dart';
 
+// ========================== Local Functions ==========================
 Future<void> _checkPermissions() async {
   await [
     Permission.bluetoothScan,
@@ -13,6 +24,7 @@ Future<void> _checkPermissions() async {
   ].request();
 }
 
+// ============================== Classes ==============================
 class BluetoothScanPage extends StatefulWidget {
   const BluetoothScanPage({super.key});
 
@@ -21,10 +33,12 @@ class BluetoothScanPage extends StatefulWidget {
 }
 
 class _BluetoothScanPageState extends State<BluetoothScanPage> {
+  // ========================== Local Variables ==========================
   BluetoothState _state = BluetoothState.UNKNOWN;
   List<BluetoothDiscoveryResult> _devices = [];
   bool _discovering = false;
 
+  // === Init
   @override
   void initState() {
     super.initState();
@@ -32,6 +46,7 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
     _initBluetooth();
   }
 
+  // ========================== Local Functions ==========================
   Future<void> _initBluetooth() async {
     final s = await FlutterBluetoothSerial.instance.state;
     setState(() => _state = s);
@@ -105,6 +120,8 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
     setState(() {});
   }
 
+  // ============================== Widget ===============================
+  // === Sub widget
   Widget _buildDeviceTile(BluetoothDiscoveryResult r) {
     final d = r.device;
     final connected =
@@ -130,31 +147,36 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
     );
   }
 
+  PreferredSizeWidget buildAppBar_Bluetooth() {
+    return AppBar(
+      title: const Text('Bluetooth'),
+      actions: [
+        IconButton(
+          icon: Icon(
+            _state.isEnabled
+                ? Icons.bluetooth_connected
+                : Icons.bluetooth_disabled,
+          ),
+          onPressed: () => _toggle(!_state.isEnabled),
+        ),
+        IconButton(
+          icon: const Icon(Icons.logout_outlined, color: Colors.red),
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const GardenScreen()),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  // === Main widget
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Bluetooth'),
-        actions: [
-          IconButton(
-            icon: Icon(
-              _state.isEnabled
-                  ? Icons.bluetooth_connected
-                  : Icons.bluetooth_disabled,
-            ),
-            onPressed: () => _toggle(!_state.isEnabled),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout_outlined, color: Colors.red),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const GardenScreen()),
-              );
-            },
-          ),
-        ],
-      ),
+      appBar: buildAppBar_Bluetooth(),
       body: Column(
         children: [
           if (BluetoothService.instance.currentDevice != null)
