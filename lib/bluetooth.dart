@@ -1,50 +1,34 @@
-// @file       bluetooth.dart
-// @copyright  Copyright (C) 2025 Your_Organization. All rights reserved.
-// @license    MIT License
-// @version    1.0.0
-// @date       2025-10-12
-// @author     Tran Hai
-// @brief      Handles Bluetooth scanning, connection, and data communication for the Garden Smart Home app.
-// @note       Uses Flutter Bluetooth Serial and Permission Handler to discover devices, manage connections, and receive data.
-
+import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'garden_manager.dart';
 
-List<double> latestValues = [0]; // lưu dữ liệu MCU gửi lên
+List<double> latestValues = [0];
 
-// ========================== Bluetooth Service ==========================
 class BluetoothService {
   BluetoothConnection? _connection;
   BluetoothDevice? _currentDevice;
+  StreamSubscription<Uint8List>? _subscription;
+  final StreamController<List<double>> _dataController =
+      StreamController<List<double>>.broadcast();
 
   static final BluetoothService instance = BluetoothService._internal();
   BluetoothService._internal();
 
+  Stream<List<double>> get dataStream => _dataController.stream;
   BluetoothDevice? get currentDevice => _currentDevice;
   bool get hasConnection => _connection != null && _connection!.isConnected;
 
-  void setConnection(BluetoothConnection c, [BluetoothDevice? device]) {
+  Future<void> connect(BluetoothDevice device) async {
+    if (hasConnection) await disconnect();
+
+    final c = await BluetoothConnection.toAddress(device.address);
     _connection = c;
-    if (device != null) _currentDevice = device;
-  }
+    _currentDevice = device;
 
-  bool isConnected(BluetoothDevice d) {
-    return _currentDevice?.address == d.address && hasConnection;
-  }
-
-  Future<void> disconnect() async {
-    await _connection?.close();
-    _connection = null;
-    _currentDevice = null;
-  }
-
-  // Listener dữ liệu MCU
-  void startListening(void Function(List<double>) onData) {
-    if (_connection == null) return;
-
-    _connection!.input?.listen((data) {
+    _subscription = _connection!.input!.asBroadcastStream().listen((data) {
       final msg = String.fromCharCodes(data);
       final lines = msg.split('\n');
       for (var line in lines) {
@@ -54,15 +38,24 @@ class BluetoothService {
               .map((e) => e.trim())
               .where((e) => e.isNotEmpty)
               .map((e) => double.tryParse(e))
-              .where((e) => e != null)
-              .map((e) => e!)
+              .whereType<double>()
               .toList();
-          if (numbers.isNotEmpty) {
-            onData(numbers);
-          }
+          if (numbers.isNotEmpty) _dataController.add(numbers);
         }
       }
     });
+  }
+
+  Future<void> disconnect() async {
+    try {
+      await _subscription?.cancel();
+    } catch (_) {}
+    try {
+      await _connection?.finish();
+    } catch (_) {}
+    _subscription = null;
+    _connection = null;
+    _currentDevice = null;
   }
 }
 
@@ -89,17 +82,30 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
   List<BluetoothDiscoveryResult> _devices = [];
   bool _discovering = false;
 
+  StreamSubscription<List<double>>? _btDataSub;
+
   @override
   void initState() {
     super.initState();
     _checkPermissions();
     _initBluetooth();
+
+    _btDataSub = BluetoothService.instance.dataStream.listen((numbers) {
+      setState(() {
+        latestValues = numbers;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _btDataSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _initBluetooth() async {
     final s = await FlutterBluetoothSerial.instance.state;
     setState(() => _state = s);
-
     FlutterBluetoothSerial.instance.onStateChanged().listen((v) {
       if (mounted) setState(() => _state = v);
     });
@@ -135,30 +141,20 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
 
   Future<void> _getBonded() async {
     final list = await FlutterBluetoothSerial.instance.getBondedDevices();
-    setState(
-      () => _devices = list
+    setState(() {
+      _devices = list
           .map((d) => BluetoothDiscoveryResult(device: d, rssi: 0))
-          .toList(),
-    );
+          .toList();
+    });
   }
 
   Future<void> _connect(BluetoothDevice d) async {
     try {
-      final c = await BluetoothConnection.toAddress(d.address);
-      BluetoothService.instance.setConnection(c, d);
-
+      await BluetoothService.instance.connect(d);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Đã kết nối ${d.name ?? d.address}')),
       );
-
-      // Bật listener tự động cập nhật latestValues
-      BluetoothService.instance.startListening((numbers) {
-        setState(() {
-          latestValues = numbers;
-        });
-      });
-
-      setState(() {}); // cập nhật UI
+      setState(() {});
     } catch (_) {
       ScaffoldMessenger.of(
         context,

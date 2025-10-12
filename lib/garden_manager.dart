@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'login_screen.dart';
 import 'bluetooth.dart';
 
-// ============================= Constants =============================
 final List<String> plantTypes = ["Xoài", "Táo", "Sầu riêng"];
 final Map<String, IconData> plantIcons = {
   "Xoài": Icons.eco,
@@ -19,18 +19,15 @@ final Map<String, Color> plantColors = {
 };
 const int maxGardens = 4;
 
-// =========================== Public Variables ========================
 double temperature = 0;
 double humidity = 0;
 double lux = 0;
 
 List<double> latestValues = [0];
 
-// ============================== Classes ==============================
 class Plant {
   String name;
   Plant({required this.name});
-
   Map<String, dynamic> toJson() => {"name": name};
   factory Plant.fromJson(Map<String, dynamic> json) =>
       Plant(name: json["name"]);
@@ -40,23 +37,17 @@ class Garden {
   String name;
   List<Plant> plants;
   Garden({required this.name, List<Plant>? plants}) : plants = plants ?? [];
-
-  Map<String, dynamic> toJson() => {
-    "name": name,
-    "plants": plants.map((p) => p.toJson()).toList(),
-  };
-
+  Map<String, dynamic> toJson() =>
+      {"name": name, "plants": plants.map((p) => p.toJson()).toList()};
   factory Garden.fromJson(Map<String, dynamic> json) => Garden(
-    name: json["name"],
-    plants:
-        (json["plants"] as List<dynamic>?)
-            ?.map((p) => Plant.fromJson(p))
-            .toList() ??
-        [],
-  );
+        name: json["name"],
+        plants: (json["plants"] as List?)
+                ?.map((p) => Plant.fromJson(p))
+                .toList() ??
+            [],
+      );
 }
 
-// ============================== Garden Screen ==============================
 class GardenScreen extends StatefulWidget {
   const GardenScreen({super.key});
   @override
@@ -66,8 +57,8 @@ class GardenScreen extends StatefulWidget {
 class _GardenScreenState extends State<GardenScreen> {
   List<Garden> gardens = [];
   int selectedGarden = 0;
+  StreamSubscription<List<double>>? _btStreamSub;
 
-  // ========================== Local Functions ==========================
   Future<File> get localFile async {
     final dir = await getApplicationDocumentsDirectory();
     return File("${dir.path}/gardens.json");
@@ -93,7 +84,29 @@ class _GardenScreenState extends State<GardenScreen> {
     }
   }
 
-  // === Các thao tác quản lý dữ liệu ===
+  @override
+  void initState() {
+    super.initState();
+    loadGardens();
+
+    _btStreamSub = BluetoothService.instance.dataStream.listen((numbers) {
+      if (numbers.length >= 3) {
+        setState(() {
+          temperature = numbers[0];
+          humidity = numbers[1];
+          lux = numbers[2];
+          latestValues = numbers;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _btStreamSub?.cancel();
+    super.dispose();
+  }
+
   void addGarden() {
     if (gardens.length >= maxGardens) return;
     setState(() {
@@ -151,73 +164,6 @@ class _GardenScreenState extends State<GardenScreen> {
     );
   }
 
-  void editEnvParams() {
-    final tempController = TextEditingController(text: temperature.toString());
-    final humidityController = TextEditingController(text: humidity.toString());
-    final luxController = TextEditingController(text: lux.toString());
-
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Chỉnh thông số"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: tempController,
-              decoration: const InputDecoration(labelText: "Nhiệt độ"),
-            ),
-            TextField(
-              controller: humidityController,
-              decoration: const InputDecoration(labelText: "Độ ẩm"),
-            ),
-            TextField(
-              controller: luxController,
-              decoration: const InputDecoration(labelText: "Ánh sáng"),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              setState(() {
-                temperature = double.tryParse(tempController.text) ?? 0;
-                humidity = double.tryParse(humidityController.text) ?? 0;
-                lux = double.tryParse(luxController.text) ?? 0;
-              });
-              Navigator.pop(context);
-            },
-            child: const Text("Lưu"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    loadGardens();
-  }
-
-  // === Các Widget con ===
-  Widget buildPlantCard(Plant plant, int index) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      child: ListTile(
-        leading: Icon(
-          plantIcons[plant.name] ?? Icons.local_florist,
-          color: plantColors[plant.name] ?? Colors.green,
-        ),
-        title: Text(plant.name),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete, color: Colors.red),
-          onPressed: () => deletePlant(index),
-        ),
-      ),
-    );
-  }
-
   Widget buildEnvInfoCard() {
     return Card(
       child: Column(
@@ -231,10 +177,7 @@ class _GardenScreenState extends State<GardenScreen> {
             title: Text("Độ ẩm: $humidity (%)"),
           ),
           ListTile(
-            leading: const Icon(
-              Icons.brightness_low_outlined,
-              color: Color.fromARGB(255, 240, 243, 73),
-            ),
+            leading: const Icon(Icons.brightness_low_outlined, color: Colors.amber),
             title: Text("Cường độ sáng: $lux (lux)"),
           ),
         ],
@@ -247,8 +190,21 @@ class _GardenScreenState extends State<GardenScreen> {
       child: ListView(
         children: [
           ...garden.plants.asMap().entries.map(
-            (e) => buildPlantCard(e.value, e.key),
-          ),
+                (e) => Card(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  child: ListTile(
+                    leading: Icon(
+                      plantIcons[e.value.name] ?? Icons.local_florist,
+                      color: plantColors[e.value.name] ?? Colors.green,
+                    ),
+                    title: Text(e.value.name),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () => deletePlant(e.key),
+                    ),
+                  ),
+                ),
+              ),
           Card(
             color: Colors.green[50],
             child: ListTile(
@@ -262,84 +218,6 @@ class _GardenScreenState extends State<GardenScreen> {
     );
   }
 
-  // === Thanh điều hướng ===
-  PreferredSizeWidget buildAppBar(Garden garden) {
-    return AppBar(
-      title: Row(
-        children: [
-          Text(garden.name),
-          if (gardens.length > 1)
-            GestureDetector(
-              onTap: () => deleteGarden(selectedGarden),
-              child: const Padding(
-                padding: EdgeInsets.only(left: 8),
-                child: Icon(Icons.close, size: 20, color: Colors.red),
-              ),
-            ),
-        ],
-      ),
-      // === Icon on Appbar
-      actions: [
-        IconButton(icon: const Icon(Icons.settings), onPressed: editEnvParams),
-        // Bluetooth
-        IconButton(
-          icon: const Icon(
-            Icons.bluetooth_connected,
-            color: Color.fromARGB(255, 13, 166, 236),
-          ),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const BluetoothScanPage(),
-              ),
-            );
-          },
-        ),
-        // Logout
-        IconButton(
-          icon: const Icon(
-            Icons.output_outlined,
-            color: Color.fromARGB(255, 240, 80, 69),
-          ),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const LoginScreen()),
-            );
-          },
-        ),
-        const SizedBox(width: 20),
-      ],
-    );
-  }
-
-  Widget buildBottomNav() {
-    return BottomAppBar(
-      child: Row(
-        children: [
-          for (int i = 0; i < gardens.length; i++)
-            Expanded(
-              child: Center(
-                child: TextButton(
-                  onPressed: () => setState(() => selectedGarden = i),
-                  child: Text(
-                    gardens[i].name,
-                    style: TextStyle(
-                      color: i == selectedGarden ? Colors.green : Colors.black,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          if (gardens.length < maxGardens)
-            TextButton(onPressed: addGarden, child: const Text("➕ Thêm vườn")),
-        ],
-      ),
-    );
-  }
-
-  // === Build UI chính ===
   @override
   Widget build(BuildContext context) {
     if (gardens.isEmpty) {
@@ -349,7 +227,18 @@ class _GardenScreenState extends State<GardenScreen> {
     final garden = gardens[selectedGarden];
 
     return Scaffold(
-      appBar: buildAppBar(garden),
+      appBar: AppBar(
+        title: Text(garden.name),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.bluetooth_connected, color: Colors.blue),
+            onPressed: () => Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const BluetoothScanPage()),
+            ),
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -360,7 +249,6 @@ class _GardenScreenState extends State<GardenScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: buildBottomNav(),
     );
   }
 }
