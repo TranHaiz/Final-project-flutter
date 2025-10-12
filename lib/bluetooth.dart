@@ -15,6 +15,7 @@ Future<void> _checkPermissions() async {
 
 class BluetoothScanPage extends StatefulWidget {
   const BluetoothScanPage({super.key});
+
   @override
   State<BluetoothScanPage> createState() => _BluetoothScanPageState();
 }
@@ -23,7 +24,6 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
   BluetoothState _state = BluetoothState.UNKNOWN;
   List<BluetoothDiscoveryResult> _devices = [];
   bool _discovering = false;
-  BluetoothDevice? _connected;
 
   @override
   void initState() {
@@ -35,6 +35,7 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
   Future<void> _initBluetooth() async {
     final s = await FlutterBluetoothSerial.instance.state;
     setState(() => _state = s);
+
     FlutterBluetoothSerial.instance.onStateChanged().listen((v) {
       if (mounted) setState(() => _state = v);
     });
@@ -58,10 +59,11 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
             final i = _devices.indexWhere(
               (e) => e.device.address == r.device.address,
             );
-            if (i >= 0)
+            if (i >= 0) {
               _devices[i] = r;
-            else
+            } else {
               _devices.add(r);
+            }
           });
         })
         .onDone(() => setState(() => _discovering = false));
@@ -79,39 +81,58 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
   Future<void> _connect(BluetoothDevice d) async {
     try {
       final c = await BluetoothConnection.toAddress(d.address);
-      if (!mounted) return;
-      setState(() => _connected = d);
-      BluetoothService.instance.setConnection(c);
-
+      BluetoothService.instance.setConnection(c, d);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Đã kết nối ${d.name ?? d.address}')),
       );
 
-      c.input
-          ?.listen((data) {
-            final msg = String.fromCharCodes(data);
-            BluetoothService.instance.onReceive(msg);
-          })
-          .onDone(() {
-            if (mounted) setState(() => _connected = null);
-          });
-    } catch (e) {
+      c.input?.listen((data) {
+        final msg = String.fromCharCodes(data);
+        BluetoothService.instance.onReceive(msg);
+      });
+
+      setState(() {}); // Cập nhật UI
+    } catch (_) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Kết nối thất bại')));
+      ).showSnackBar(const SnackBar(content: Text('Kết nối thất bại')));
     }
   }
 
   Future<void> _disconnect() async {
     await BluetoothService.instance.disconnect();
-    setState(() => _connected = null);
+    setState(() {});
+  }
+
+  Widget _buildDeviceTile(BluetoothDiscoveryResult r) {
+    final d = r.device;
+    final connected = BluetoothService.instance.isConnected(d);
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: ListTile(
+        leading: const Icon(Icons.bluetooth, color: Colors.blue),
+        title: Text(d.name ?? 'Không tên'),
+        subtitle: Text(d.address),
+        trailing: connected
+            ? IconButton(
+                icon: const Icon(Icons.close, color: Colors.red),
+                onPressed: _disconnect,
+              )
+            : ElevatedButton(
+                onPressed: !BluetoothService.instance.hasConnection
+                    ? () => _connect(d)
+                    : null,
+                child: const Text('Kết nối'),
+              ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Kết nối Bluetooth'),
+        title: const Text('Bluetooth'),
         actions: [
           IconButton(
             icon: Icon(
@@ -121,27 +142,20 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
             ),
             onPressed: () => _toggle(!_state.isEnabled),
           ),
-          // back to garden screen
           IconButton(
-            icon: const Icon(
-              Icons.logout_outlined,
-              color: Color.fromARGB(255, 230, 11, 48),
-            ),
+            icon: const Icon(Icons.logout_outlined, color: Colors.red),
             onPressed: () {
-              Navigator.pushReplacement(
+              Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const GardenScreen()),
               );
             },
           ),
-          const SizedBox(width: 20),
-          if (_connected != null)
-            IconButton(icon: const Icon(Icons.close), onPressed: _disconnect),
         ],
       ),
       body: Column(
         children: [
-          if (_connected != null)
+          if (BluetoothService.instance.currentDevice != null)
             Container(
               padding: const EdgeInsets.all(12),
               color: Colors.green.shade100,
@@ -150,7 +164,10 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
                   const Icon(Icons.bluetooth_connected, color: Colors.green),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(_connected!.name ?? _connected!.address),
+                    child: Text(
+                      BluetoothService.instance.currentDevice!.name ??
+                          BluetoothService.instance.currentDevice!.address,
+                    ),
                   ),
                   TextButton(onPressed: _disconnect, child: const Text('Ngắt')),
                 ],
@@ -183,23 +200,7 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
                 ? const Center(child: Text('Không có thiết bị'))
                 : ListView.builder(
                     itemCount: _devices.length,
-                    itemBuilder: (_, i) {
-                      final d = _devices[i].device;
-                      return ListTile(
-                        leading: const Icon(
-                          Icons.bluetooth,
-                          color: Colors.blue,
-                        ),
-                        title: Text(d.name ?? 'Không tên'),
-                        subtitle: Text(d.address),
-                        trailing: ElevatedButton(
-                          onPressed: _connected == null
-                              ? () => _connect(d)
-                              : null,
-                          child: const Text('Kết nối'),
-                        ),
-                      );
-                    },
+                    itemBuilder: (_, i) => _buildDeviceTile(_devices[i]),
                   ),
           ),
         ],

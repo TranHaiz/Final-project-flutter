@@ -1,42 +1,32 @@
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
-import 'dart:typed_data';
 
 class BluetoothService {
+  BluetoothConnection? _connection;
+  BluetoothDevice? _currentDevice;
+
   static final BluetoothService instance = BluetoothService._internal();
   BluetoothService._internal();
 
-  BluetoothConnection? _connection;
-  final List<void Function(String)> _listeners = [];
+  BluetoothDevice? get currentDevice => _currentDevice;
+  bool get hasConnection => _connection != null && _connection!.isConnected;
 
-  void setConnection(BluetoothConnection c) {
+  void setConnection(BluetoothConnection c, [BluetoothDevice? device]) {
     _connection = c;
+    if (device != null) _currentDevice = device;
   }
 
-  bool get isConnected => _connection?.isConnected ?? false;
+  bool isConnected(BluetoothDevice d) {
+    return _currentDevice?.address == d.address && hasConnection;
+  }
 
   Future<void> disconnect() async {
     await _connection?.close();
     _connection = null;
+    _currentDevice = null;
   }
 
-  Future<void> send(String data) async {
-    if (_connection?.isConnected ?? false) {
-      _connection!.output.add(Uint8List.fromList(data.codeUnits));
-      await _connection!.output.allSent;
-    }
-  }
-
-  void onReceive(String msg) {
-    for (var f in _listeners) {
-      f(msg);
-    }
-  }
-
-  void addListener(void Function(String) callback) {
-    _listeners.add(callback);
-  }
-
-  void removeListener(void Function(String) callback) {
-    _listeners.remove(callback);
+  void onReceive(String data) {
+    // Xử lý dữ liệu MCU gửi lên
+    print('Received: $data');
   }
 }
