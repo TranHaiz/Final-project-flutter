@@ -17,11 +17,12 @@ final Map<String, Color> plantColors = {
   "Táo": Colors.redAccent,
   "Sầu riêng": Colors.green,
 };
+
 const int maxGardens = 4;
 
-double temperature = 0;
-double humidity = 0;
-double lux = 0;
+List<double> temperature = List.filled(maxGardens, 0.0);
+List<double> humidity = List.filled(maxGardens, 0.0);
+List<double> lux = List.filled(maxGardens, 0.0);
 
 class Plant {
   String name;
@@ -55,7 +56,7 @@ class GardenScreen extends StatefulWidget {
 class _GardenScreenState extends State<GardenScreen> {
   List<Garden> gardens = [];
   int selectedGarden = 0;
-  StreamSubscription<List<double>>? _btStreamSub;
+  StreamSubscription? _btStreamSub;
 
   Future<File> get localFile async {
     final dir = await getApplicationDocumentsDirectory();
@@ -86,12 +87,18 @@ class _GardenScreenState extends State<GardenScreen> {
   void initState() {
     super.initState();
     loadGardens();
+
     _btStreamSub = BluetoothService.instance.dataStream.listen((numbers) {
-      if (numbers.length >= 3) {
+      if (numbers is List && numbers.isNotEmpty) {
         setState(() {
-          temperature = numbers[0];
-          humidity = numbers[1];
-          lux = numbers[2];
+          for (int i = 0; i < maxGardens; i++) {
+            int base = i * 3;
+            if (numbers.length >= base + 3) {
+              temperature[i] = (numbers[base] as num).toDouble();
+              humidity[i] = (numbers[base + 1] as num).toDouble();
+              lux[i] = (numbers[base + 2] as num).toDouble();
+            }
+          }
         });
       }
     });
@@ -114,7 +121,6 @@ class _GardenScreenState extends State<GardenScreen> {
 
   void deleteGarden(int index) {
     if (gardens.length == 1) return;
-
     setState(() {
       gardens.removeAt(index);
       for (int i = 0; i < gardens.length; i++) {
@@ -140,9 +146,9 @@ class _GardenScreenState extends State<GardenScreen> {
         children: plantTypes.map((p) {
           return SimpleDialogOption(
             onPressed: () {
-              setState(
-                () => gardens[selectedGarden].plants.add(Plant(name: p)),
-              );
+              setState(() {
+                gardens[selectedGarden].plants.add(Plant(name: p));
+              });
               saveGardens();
               Navigator.pop(context);
             },
@@ -168,18 +174,24 @@ class _GardenScreenState extends State<GardenScreen> {
         children: [
           ListTile(
             leading: const Icon(Icons.thermostat, color: Colors.orange),
-            title: Text("Nhiệt độ: ${temperature.toStringAsFixed(1)} °C"),
+            title: Text(
+              "Nhiệt độ: ${temperature[selectedGarden].toStringAsFixed(1)} °C",
+            ),
           ),
           ListTile(
             leading: const Icon(Icons.water_drop, color: Colors.blue),
-            title: Text("Độ ẩm: ${humidity.toStringAsFixed(1)} %"),
+            title: Text(
+              "Độ ẩm: ${humidity[selectedGarden].toStringAsFixed(1)} %",
+            ),
           ),
           ListTile(
             leading: const Icon(
               Icons.brightness_low_outlined,
               color: Colors.amber,
             ),
-            title: Text("Cường độ sáng: ${lux.toStringAsFixed(1)} lux"),
+            title: Text(
+              "Ánh sáng: ${lux[selectedGarden].toStringAsFixed(1)} lux",
+            ),
           ),
         ],
       ),
@@ -200,7 +212,7 @@ class _GardenScreenState extends State<GardenScreen> {
                 ),
                 title: Text(e.value.name),
                 trailing: IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
+                  icon: const Icon(Icons.close, color: Colors.red),
                   onPressed: () => deletePlant(e.key),
                 ),
               ),
@@ -223,7 +235,6 @@ class _GardenScreenState extends State<GardenScreen> {
     return AppBar(
       title: Text(garden.name),
       actions: [
-        // === Bluetooth
         IconButton(
           icon: const Icon(Icons.bluetooth_connected, color: Colors.blue),
           onPressed: () => Navigator.pushReplacement(
@@ -231,12 +242,10 @@ class _GardenScreenState extends State<GardenScreen> {
             MaterialPageRoute(builder: (_) => const BluetoothScanPage()),
           ),
         ),
-        // ==== Delete garden
         IconButton(
           icon: const Icon(Icons.close, color: Colors.red),
           onPressed: () => deleteGarden(selectedGarden),
         ),
-        // === Logout
         IconButton(
           icon: const Icon(Icons.logout, color: Colors.red),
           onPressed: () => Navigator.pushReplacement(
