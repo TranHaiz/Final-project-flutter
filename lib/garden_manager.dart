@@ -1,3 +1,12 @@
+// @file       garden_manager.dart
+// @copyright  Copyright (C) 2025 HAQ. All rights reserved.
+// @license    This project is released under the <Your_License> License.
+// @version    major.minor.patch
+// @date       2025-10-9
+// @author     Hai Tran
+// @brief      Manages garden data, environment parameters, and user interactions
+//             for monitoring and controlling multiple gardens within the app.
+// ============================== Imports ==============================
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
@@ -6,6 +15,10 @@ import 'package:path_provider/path_provider.dart';
 import 'login_screen.dart';
 import 'bluetooth.dart';
 
+// ============================= Constants =============================
+const int maxGardens = 4;
+
+// =========================== Private Variables =======================
 final List<String> plantTypes = ["Xoài", "Táo", "Sầu riêng"];
 final Map<String, IconData> plantIcons = {
   "Xoài": Icons.eco,
@@ -17,13 +30,11 @@ final Map<String, Color> plantColors = {
   "Táo": Colors.redAccent,
   "Sầu riêng": Colors.green,
 };
-
-const int maxGardens = 4;
-
 List<double> temperature = List.filled(maxGardens, 0.0);
 List<double> humidity = List.filled(maxGardens, 0.0);
 List<double> lux = List.filled(maxGardens, 0.0);
 
+// ============================== Classes ==============================
 class Plant {
   String name;
   Plant({required this.name});
@@ -58,6 +69,7 @@ class _GardenScreenState extends State<GardenScreen> {
   int selectedGarden = 0;
   StreamSubscription? _btStreamSub;
 
+  // ========================== Local Functions ==========================
   Future<File> get localFile async {
     final dir = await getApplicationDocumentsDirectory();
     return File("${dir.path}/gardens.json");
@@ -88,6 +100,7 @@ class _GardenScreenState extends State<GardenScreen> {
     super.initState();
     loadGardens();
 
+    // === Get data from MCU
     _btStreamSub = BluetoothService.instance.dataStream.listen((numbers) {
       if (numbers is List && numbers.isNotEmpty) {
         setState(() {
@@ -110,6 +123,7 @@ class _GardenScreenState extends State<GardenScreen> {
     super.dispose();
   }
 
+  // ========================== Local Functions ==========================
   void addGarden() {
     if (gardens.length >= maxGardens) return;
     setState(() {
@@ -168,6 +182,7 @@ class _GardenScreenState extends State<GardenScreen> {
     );
   }
 
+  // =========================== Sub Widgets =============================
   Widget buildEnvInfoCard() {
     return Card(
       child: Column(
@@ -283,6 +298,7 @@ class _GardenScreenState extends State<GardenScreen> {
     );
   }
 
+  // =========================== Main Widget =============================
   @override
   Widget build(BuildContext context) {
     if (gardens.isEmpty) {

@@ -1,7 +1,21 @@
-// Màn hình đăng nhập (hardcode username/password)
+// @file       login_screen.dart
+// @copyright  Copyright (C) 2025 HAQ. All rights reserved.
+// @license    This project is released under the <Your_License> License.
+// @version    major.minor.patch
+// @date       2025-10-9
+// @author     Hai Tran
+// @author     Hung Le
+// @author     Khang Le
+// @brief      Implements the login UI and authentication logic.
+// ============================== Imports ==============================
 import 'package:flutter/material.dart';
 import 'garden_manager.dart';
 
+// ============================= Constants =============================
+const hardUsername = "haq";
+const hardPassword = "1";
+
+// ============================ Global Functions =======================
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -14,10 +28,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   String? _errorMessage;
 
+// ========================== Local Functions ==========================
   void _login() {
-    const hardUsername = "haq";
-    const hardPassword = "1";
-
     if (_usernameController.text == hardUsername &&
         _passwordController.text == hardPassword) {
       Navigator.pushReplacement(
@@ -31,6 +43,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+// =========================== Main Widget =============================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -40,8 +53,10 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text("Đăng nhập",
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+              const Text(
+                "Đăng nhập",
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 30),
               TextField(
                 controller: _usernameController,
@@ -54,15 +69,9 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 20),
               if (_errorMessage != null)
-                Text(
-                  _errorMessage!,
-                  style: const TextStyle(color: Colors.red),
-                ),
+                Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
               const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _login,
-                child: const Text("Login"),
-              ),
+              ElevatedButton(onPressed: _login, child: const Text("Login")),
             ],
           ),
         ),
@@ -70,3 +79,5 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+
+// ============================ End of File ============================

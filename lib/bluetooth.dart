@@ -180,6 +180,7 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
     setState(() {});
   }
 
+  // =========================== Main Widget =============================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -212,7 +213,10 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
               padding: const EdgeInsets.all(8),
               child: Text(
                 'Connected: ${BluetoothService.instance.currentDevice!.name ?? BluetoothService.instance.currentDevice!.address}',
-                style: const TextStyle(color: Colors.green),
+                style: const TextStyle(
+                  color: Color.fromARGB(255, 12, 1, 1),
+                  backgroundColor: Color.fromARGB(66, 37, 209, 252),
+                ),
               ),
             ),
           Row(
