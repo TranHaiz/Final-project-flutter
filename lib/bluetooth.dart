@@ -2,7 +2,7 @@
 // @copyright  Copyright (C) 2025 HAQ. All rights reserved.
 // @license    This project is released under the <Your_License> License.
 // @version    major.minor.patch
-// @date       2025-10-9
+// @date       2025-10-12
 // @author     Hai Tran
 // @brief      Manages Bluetooth communication and device control.
 // ============================== Imports ==============================
@@ -100,6 +100,7 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
     _checkPermissions();
     _initBluetooth();
 
+    // === Listen data from MCU
     _btDataSub = BluetoothService.instance.dataStream.listen((numbers) {
       setState(() {
         latestValues = numbers;
@@ -107,12 +108,14 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
     });
   }
 
+  // === Turn off bluetotooth connect when app off
   @override
   void dispose() {
     _btDataSub?.cancel();
     super.dispose();
   }
 
+  // ========================== Local Functions ==========================
   Future<void> _initBluetooth() async {
     final s = await FlutterBluetoothSerial.instance.state;
     setState(() => _state = s);
@@ -175,56 +178,6 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
   Future<void> _disconnect() async {
     await BluetoothService.instance.disconnect();
     setState(() {});
-  }
-
-  Widget _buildDeviceTile(BluetoothDiscoveryResult r) {
-    final d = r.device;
-    final connected =
-        BluetoothService.instance.currentDevice?.address == d.address;
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: ListTile(
-        leading: const Icon(Icons.bluetooth, color: Colors.blue),
-        title: Text(d.name ?? 'Không tên'),
-        subtitle: Text(d.address),
-        trailing: connected
-            ? IconButton(
-                icon: const Icon(Icons.close, color: Colors.red),
-                onPressed: _disconnect,
-              )
-            : ElevatedButton(
-                onPressed: BluetoothService.instance.currentDevice == null
-                    ? () => _connect(d)
-                    : null,
-                child: const Text('Kết nối'),
-              ),
-      ),
-    );
-  }
-
-  PreferredSizeWidget buildAppBar() {
-    return AppBar(
-      title: const Text('Bluetooth'),
-      actions: [
-        IconButton(
-          icon: Icon(
-            _state.isEnabled
-                ? Icons.bluetooth_connected
-                : Icons.bluetooth_disabled,
-          ),
-          onPressed: () => _toggle(!_state.isEnabled),
-        ),
-        IconButton(
-          icon: const Icon(Icons.logout_outlined, color: Colors.red),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const GardenScreen()),
-            );
-          },
-        ),
-      ],
-    );
   }
 
   @override
