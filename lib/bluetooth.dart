@@ -1,3 +1,11 @@
+// @file       bluetooth.dart
+// @copyright  Copyright (C) 2025 HAQ. All rights reserved.
+// @license    This project is released under the <Your_License> License.
+// @version    major.minor.patch
+// @date       2025-10-9
+// @author     Hai Tran
+// @brief      Manages Bluetooth communication and device control.
+// ============================== Imports ==============================
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -5,8 +13,10 @@ import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'garden_manager.dart';
 
+// =========================== Private Variables =======================
 List<double> latestValues = [0];
 
+// ============================== Classes ==============================
 class BluetoothService {
   BluetoothConnection? _connection;
   BluetoothDevice? _currentDevice;
@@ -220,55 +230,77 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: buildAppBar(),
+      appBar: AppBar(
+        title: const Text('Bluetooth'),
+        actions: [
+          IconButton(
+            icon: Icon(
+              _state.isEnabled
+                  ? Icons.bluetooth_connected
+                  : Icons.bluetooth_disabled,
+            ),
+            onPressed: () => _toggle(!_state.isEnabled),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.red),
+            onPressed: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const GardenScreen()),
+              );
+            },
+          ),
+        ],
+      ),
       body: Column(
         children: [
           if (BluetoothService.instance.currentDevice != null)
-            Container(
-              padding: const EdgeInsets.all(12),
-              color: Colors.green.shade100,
-              child: Row(
-                children: [
-                  const Icon(Icons.bluetooth_connected, color: Colors.green),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      BluetoothService.instance.currentDevice!.name ??
-                          BluetoothService.instance.currentDevice!.address,
-                    ),
-                  ),
-                  TextButton(onPressed: _disconnect, child: const Text('Ngắt')),
-                ],
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text(
+                'Connected: ${BluetoothService.instance.currentDevice!.name ?? BluetoothService.instance.currentDevice!.address}',
+                style: const TextStyle(color: Colors.green),
               ),
             ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _discovering ? null : _startDiscovery,
-                    icon: const Icon(Icons.search),
-                    label: Text(_discovering ? 'Đang quét...' : 'Quét mới'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _getBonded,
-                    icon: const Icon(Icons.devices),
-                    label: const Text('Đã ghép nối'),
-                  ),
-                ),
-              ],
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              ElevatedButton(
+                onPressed: _discovering ? null : _startDiscovery,
+                child: Text(_discovering ? 'Scanning...' : 'Scan'),
+              ),
+              ElevatedButton(
+                onPressed: _getBonded,
+                child: const Text('Paired'),
+              ),
+              ElevatedButton(
+                onPressed: _disconnect,
+                child: const Text('Disconnect'),
+              ),
+            ],
           ),
+          const SizedBox(height: 10),
           Expanded(
             child: _devices.isEmpty
-                ? const Center(child: Text('Không có thiết bị'))
+                ? const Center(child: Text('No devices'))
                 : ListView.builder(
                     itemCount: _devices.length,
-                    itemBuilder: (_, i) => _buildDeviceTile(_devices[i]),
+                    itemBuilder: (_, i) {
+                      final d = _devices[i].device;
+                      final connected =
+                          BluetoothService.instance.currentDevice?.address ==
+                          d.address;
+                      return ListTile(
+                        title: Text(d.name ?? 'Unknown'),
+                        subtitle: Text(d.address),
+                        trailing: ElevatedButton(
+                          onPressed: connected
+                              ? _disconnect
+                              : () => _connect(d),
+                          child: Text(connected ? 'Disconnect' : 'Connect'),
+                        ),
+                      );
+                    },
                   ),
           ),
         ],
