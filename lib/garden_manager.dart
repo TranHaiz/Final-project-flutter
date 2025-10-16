@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'login_screen.dart';
 import 'bluetooth.dart';
+import 'control_screen.dart';
 
 // ============================= Constants =============================
 const int maxGardens = 4;
@@ -214,36 +215,42 @@ class _GardenScreenState extends State<GardenScreen> {
   }
 
   Widget buildPlantList(Garden garden) {
-    return Expanded(
-      child: ListView(
-        children: [
-          ...garden.plants.asMap().entries.map(
-            (e) => Card(
-              margin: const EdgeInsets.symmetric(vertical: 4),
-              child: ListTile(
-                leading: Icon(
-                  plantIcons[e.value.name] ?? Icons.local_florist,
-                  color: plantColors[e.value.name] ?? Colors.green,
-                ),
-                title: Text(e.value.name),
-                trailing: IconButton(
-                  icon: const Icon(Icons.close, color: Colors.red),
-                  onPressed: () => deletePlant(e.key),
-                ),
-              ),
+    List<Widget> plantWidgets = [];
+
+    // Duyệt từng cây trong danh sách
+    for (int i = 0; i < garden.plants.length; i++) {
+      var plant = garden.plants[i];
+      plantWidgets.add(
+        Card(
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          child: ListTile(
+            leading: Icon(
+              plantIcons[plant.name] ?? Icons.local_florist,
+              color: plantColors[plant.name] ?? Colors.green,
+            ),
+            title: Text(plant.name),
+            trailing: IconButton(
+              icon: const Icon(Icons.close, color: Colors.red),
+              onPressed: () => deletePlant(i),
             ),
           ),
-          Card(
-            color: Colors.green[50],
-            child: ListTile(
-              leading: const Icon(Icons.add, color: Colors.green),
-              title: const Text("Thêm cây"),
-              onTap: addPlant,
-            ),
-          ),
-        ],
+        ),
+      );
+    }
+
+    // Thêm Card "Thêm cây" vào cuối
+    plantWidgets.add(
+      Card(
+        color: Colors.green[50],
+        child: ListTile(
+          leading: const Icon(Icons.add, color: Colors.green),
+          title: const Text("Thêm cây"),
+          onTap: addPlant,
+        ),
       ),
     );
+
+    return Expanded(child: ListView(children: plantWidgets));
   }
 
   PreferredSizeWidget buildAppBar(Garden garden) {
@@ -255,6 +262,16 @@ class _GardenScreenState extends State<GardenScreen> {
           onPressed: () => Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const BluetoothScanPage()),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(
+            Icons.construction_outlined,
+            color: Color.fromARGB(255, 75, 86, 95),
+          ),
+          onPressed: () => Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const ControlScreen()),
           ),
         ),
         IconButton(
