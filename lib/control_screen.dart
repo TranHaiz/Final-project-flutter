@@ -93,6 +93,17 @@ class _ControlScreenState extends State<ControlScreen> {
       title: const Text('Điều khiển thiết bị'),
       actions: [
         IconButton(
+          icon: const Icon(
+            Icons.sync,
+            color: Color.fromARGB(255, 10, 201, 235),
+          ),
+          onPressed: () async {
+            final command =
+                "${actuators[0].state},${actuators[1].state},${actuators[2].state},${actuators[3].state}\n";
+            await BluetoothService.instance.sendData(command);
+          },
+        ),
+        IconButton(
           icon: const Icon(Icons.logout, color: Colors.red),
           onPressed: () {
             Navigator.pushReplacement(
