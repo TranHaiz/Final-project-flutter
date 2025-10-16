@@ -9,6 +9,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'garden_manager.dart';
+import 'bluetooth.dart';
 
 const numbersActuator = 4;
 
@@ -69,11 +70,14 @@ class _ControlScreenState extends State<ControlScreen> {
             title: Text(actuators[i].name),
             trailing: Switch(
               value: actuators[i].state,
-              onChanged: (value) {
+              onChanged: (_) async {
                 setState(() {
-                  actuators[i].state = value;
+                  actuators[i].state = !actuators[i].state;
                 });
-                _saveActuatorState(i, value);
+
+                final command = "$i+${actuators[i].state}";
+                await BluetoothService.instance.sendData(command);
+                _saveActuatorState(i, actuators[i].state);
               },
             ),
           ),

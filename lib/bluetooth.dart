@@ -8,6 +8,7 @@
 // ============================== Imports ==============================
 import 'dart:async';
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -66,6 +67,16 @@ class BluetoothService {
     _subscription = null;
     _connection = null;
     _currentDevice = null;
+  }
+
+  // ============================ Global Functions =======================
+  Future<void> sendData(String data) async {
+    if (!hasConnection) return;
+
+    try {
+      _connection!.output.add(Uint8List.fromList(utf8.encode(data + '\n')));
+      await _connection!.output.allSent;
+    } catch (_) {}
   }
 }
 
