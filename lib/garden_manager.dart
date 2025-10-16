@@ -258,25 +258,28 @@ class _GardenScreenState extends State<GardenScreen> {
   }
 
   Widget buildBottomNav() {
-    return BottomAppBar(
-      child: Row(
-        children: [
-          for (int i = 0; i < gardens.length; i++)
-            Expanded(
-              child: TextButton(
-                onPressed: () => setState(() => selectedGarden = i),
-                child: Text(
-                  gardens[i].name,
-                  style: TextStyle(
-                    color: i == selectedGarden ? Colors.green : Colors.black,
-                  ),
-                ),
-              ),
-            ),
-          if (gardens.length < maxGardens)
-            TextButton(onPressed: addGarden, child: const Text("➕ Thêm vườn")),
-        ],
-      ),
+    return BottomNavigationBar(
+      currentIndex: selectedGarden,
+      onTap: (index) {
+        if (index == gardens.length && gardens.length < maxGardens) {
+          addGarden();
+        } else if (index < gardens.length) {
+          setState(() => selectedGarden = index);
+        }
+      },
+      items: [
+        for (int i = 0; i < gardens.length; i++)
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.local_florist_outlined),
+            label: gardens[i].name,
+          ),
+        if (gardens.length < maxGardens)
+          const BottomNavigationBarItem(
+            icon: Icon(Icons.add),
+            label: 'Thêm vườn',
+          ),
+      ],
+      type: BottomNavigationBarType.fixed,
     );
   }
 
