@@ -103,7 +103,7 @@ class _GardenScreenState extends State<GardenScreen> {
 
     // === Get data from MCU
     _btStreamSub = BluetoothService.instance.dataStream.listen((numbers) {
-      if (numbers is List && numbers.isNotEmpty) {
+      if (numbers.isNotEmpty) {
         setState(() {
           for (int i = 0; i < maxGardens; i++) {
             int base = i * 3;
