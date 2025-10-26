@@ -209,7 +209,7 @@ class _ControlScreenState extends State<ControlScreen>
             await _syncStatesWithDevice();
           },
         ),
-        // Nút reset (tùy chọn)
+        // Nút reset
         IconButton(
           icon: const Icon(Icons.refresh, color: Colors.orange),
           tooltip: 'Reset tất cả LED',

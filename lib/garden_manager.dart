@@ -47,16 +47,45 @@ class Plant {
 class Garden {
   String name;
   List<Plant> plants;
+
+  // Constructor
   Garden({required this.name, List<Plant>? plants}) : plants = plants ?? [];
-  Map<String, dynamic> toJson() => {
-    "name": name,
-    "plants": plants.map((p) => p.toJson()).toList(),
-  };
-  factory Garden.fromJson(Map<String, dynamic> json) => Garden(
-    name: json["name"],
-    plants:
-        (json["plants"] as List?)?.map((p) => Plant.fromJson(p)).toList() ?? [],
-  );
+
+  // Garden -> JSON
+  Map<String, dynamic> toJson() {
+    Map<String, dynamic> jsonData = {};
+    List<Map<String, dynamic>> jsonPlants = [];
+
+    // duyệt qua từng phần tử trong danh sách plants
+    for (int i = 0; i < plants.length; i++) {
+      Plant p = plants[i];
+      jsonPlants.add(p.toJson());
+    }
+
+    jsonData["name"] = name;
+    jsonData["plants"] = jsonPlants;
+
+    return jsonData;
+  }
+
+  // Garden from JSON (factory constructor)
+  factory Garden.fromJson(Map<String, dynamic> json) {
+    String nameValue = json["name"];
+    List<Plant> plantList = [];
+
+    // nếu JSON có mảng "plants"
+    if (json["plants"] != null) {
+      List<dynamic> jsonPlants = json["plants"];
+
+      for (int i = 0; i < jsonPlants.length; i++) {
+        var p = jsonPlants[i];
+        Plant plantObject = Plant.fromJson(p);
+        plantList.add(plantObject);
+      }
+    }
+
+    return Garden(name: nameValue, plants: plantList);
+  }
 }
 
 class GardenScreen extends StatefulWidget {
@@ -71,11 +100,13 @@ class _GardenScreenState extends State<GardenScreen> {
   StreamSubscription? _btStreamSub;
 
   // ========================== Local Functions ==========================
+  // Get data from memory
   Future<File> get localFile async {
     final dir = await getApplicationDocumentsDirectory();
     return File("${dir.path}/gardens.json");
   }
 
+  // Save data to memory
   Future<void> saveGardens() async {
     final file = await localFile;
     await file.writeAsString(
@@ -83,12 +114,17 @@ class _GardenScreenState extends State<GardenScreen> {
     );
   }
 
+  // Load garden from memory
   Future<void> loadGardens() async {
     final file = await localFile;
     if (await file.exists()) {
       final data = jsonDecode(await file.readAsString());
       setState(() {
-        gardens = (data as List).map((g) => Garden.fromJson(g)).toList();
+        for (var g in data) {
+          gardens.add(
+            Garden.fromJson(g),
+          ); // chuyển từng phần tử JSON -> đối tượng Garden
+        }
       });
     } else {
       setState(() => gardens = [Garden(name: "Vườn 1")]);
@@ -101,7 +137,7 @@ class _GardenScreenState extends State<GardenScreen> {
     super.initState();
     loadGardens();
 
-    // === Get data from MCU
+    // Get data from MCU
     _btStreamSub = BluetoothService.instance.dataStream.listen((numbers) {
       if (numbers.isNotEmpty) {
         setState(() {
@@ -156,30 +192,38 @@ class _GardenScreenState extends State<GardenScreen> {
   void addPlant() {
     showDialog(
       context: context,
-      builder: (_) => SimpleDialog(
-        title: const Text("Chọn cây"),
-        children: plantTypes.map((p) {
-          return SimpleDialogOption(
-            onPressed: () {
-              setState(() {
-                gardens[selectedGarden].plants.add(Plant(name: p));
-              });
-              saveGardens();
-              Navigator.pop(context);
-            },
-            child: Row(
-              children: [
-                Icon(
-                  plantIcons[p] ?? Icons.local_florist,
-                  color: plantColors[p] ?? Colors.green,
-                ),
-                const SizedBox(width: 8),
-                Text(p),
-              ],
+      builder: (_) {
+        List<Widget> options = [];
+
+        for (int i = 0; i < plantTypes.length; i++) {
+          String p = plantTypes[i];
+
+          options.add(
+            SimpleDialogOption(
+              onPressed: () {
+                setState(() {
+                  gardens[selectedGarden].plants.add(Plant(name: p));
+                });
+
+                saveGardens();
+                Navigator.pop(context);
+              },
+              child: Row(
+                children: [
+                  Icon(
+                    plantIcons[p] ?? Icons.local_florist,
+                    color: plantColors[p] ?? Colors.green,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(p),
+                ],
+              ),
             ),
           );
-        }).toList(),
-      ),
+        }
+
+        return SimpleDialog(title: const Text("Chọn cây"), children: options);
+      },
     );
   }
 
@@ -257,6 +301,7 @@ class _GardenScreenState extends State<GardenScreen> {
     return AppBar(
       title: Text(garden.name),
       actions: [
+        // Bluetooth
         IconButton(
           icon: const Icon(Icons.bluetooth_connected, color: Colors.blue),
           onPressed: () => Navigator.pushReplacement(
@@ -264,6 +309,7 @@ class _GardenScreenState extends State<GardenScreen> {
             MaterialPageRoute(builder: (_) => const BluetoothScanPage()),
           ),
         ),
+        // Control MCU
         IconButton(
           icon: const Icon(
             Icons.construction_outlined,
@@ -274,10 +320,12 @@ class _GardenScreenState extends State<GardenScreen> {
             MaterialPageRoute(builder: (_) => const ControlScreen()),
           ),
         ),
+        // Delete garden
         IconButton(
           icon: const Icon(Icons.close, color: Colors.red),
           onPressed: () => deleteGarden(selectedGarden),
         ),
+        // Log out
         IconButton(
           icon: const Icon(Icons.logout, color: Colors.red),
           onPressed: () => Navigator.pushReplacement(

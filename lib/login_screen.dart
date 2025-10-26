@@ -28,7 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   String? _errorMessage;
 
-// ========================== Local Functions ==========================
+  // ========================== Local Functions ==========================
   void _login() {
     if (_usernameController.text == hardUsername &&
         _passwordController.text == hardPassword) {
@@ -43,35 +43,49 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-// =========================== Main Widget =============================
+  // =========================== Main Widget =============================
   @override
   Widget build(BuildContext context) {
+    final title = const Text(
+      "Đăng nhập",
+      style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+    );
+
+    final usernameField = TextField(
+      controller: _usernameController,
+      decoration: const InputDecoration(labelText: "Username"),
+    );
+
+    final passwordField = TextField(
+      controller: _passwordController,
+      decoration: const InputDecoration(labelText: "Password"),
+      obscureText: true,
+    );
+
+    final errorText = _errorMessage != null
+        ? Text(_errorMessage!, style: const TextStyle(color: Colors.red))
+        : const SizedBox.shrink();
+
+    final loginButton = ElevatedButton(
+      onPressed: _login,
+      child: const Text("Login"),
+    );
+
     return Scaffold(
       body: Center(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text(
-                "Đăng nhập",
-                style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-              ),
+              title,
               const SizedBox(height: 30),
-              TextField(
-                controller: _usernameController,
-                decoration: const InputDecoration(labelText: "Username"),
-              ),
-              TextField(
-                controller: _passwordController,
-                decoration: const InputDecoration(labelText: "Password"),
-                obscureText: true,
-              ),
+              usernameField,
+              passwordField,
               const SizedBox(height: 20),
-              if (_errorMessage != null)
-                Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+              errorText,
               const SizedBox(height: 20),
-              ElevatedButton(onPressed: _login, child: const Text("Login")),
+              loginButton,
             ],
           ),
         ),
