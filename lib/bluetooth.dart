@@ -191,88 +191,89 @@ class _BluetoothScanPageState extends State<BluetoothScanPage> {
     setState(() {});
   }
 
+  // =========================== Sub Widgets =============================
+  PreferredSizeWidget buildAppBar() {
+    return AppBar(
+      title: const Text('Bluetooth'),
+      actions: [
+        IconButton(
+          icon: Icon(
+            _state.isEnabled
+                ? Icons.bluetooth_connected
+                : Icons.bluetooth_disabled,
+          ),
+          onPressed: () => _toggle(!_state.isEnabled),
+        ),
+        IconButton(
+          icon: const Icon(Icons.logout, color: Colors.red),
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const GardenScreen()),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget buildBody() {
+    return Column(
+      children: [
+        if (BluetoothService.instance.currentDevice != null)
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Text(
+              'Connected: ${BluetoothService.instance.currentDevice!.name ?? BluetoothService.instance.currentDevice!.address}',
+              style: const TextStyle(
+                color: Color.fromARGB(255, 12, 1, 1),
+                backgroundColor: Color.fromARGB(66, 37, 209, 252),
+              ),
+            ),
+          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            ElevatedButton(
+              onPressed: _discovering ? null : _startDiscovery,
+              child: Text(_discovering ? 'Scanning...' : 'Scan'),
+            ),
+            ElevatedButton(onPressed: _getBonded, child: const Text('Paired')),
+            ElevatedButton(
+              onPressed: _disconnect,
+              child: const Text('Disconnect'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: _devices.isEmpty
+              ? const Center(child: Text('No devices'))
+              : ListView.builder(
+                  itemCount: _devices.length,
+                  itemBuilder: (_, i) {
+                    final d = _devices[i].device;
+                    final connected =
+                        BluetoothService.instance.currentDevice?.address ==
+                        d.address;
+                    return ListTile(
+                      title: Text(d.name ?? 'Unknown'),
+                      subtitle: Text(d.address),
+                      trailing: ElevatedButton(
+                        onPressed: connected ? _disconnect : () => _connect(d),
+                        child: Text(connected ? 'Disconnect' : 'Connect'),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
   // =========================== Main Widget =============================
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Bluetooth'),
-        actions: [
-          IconButton(
-            icon: Icon(
-              _state.isEnabled
-                  ? Icons.bluetooth_connected
-                  : Icons.bluetooth_disabled,
-            ),
-            onPressed: () => _toggle(!_state.isEnabled),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.red),
-            onPressed: () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const GardenScreen()),
-              );
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          if (BluetoothService.instance.currentDevice != null)
-            Padding(
-              padding: const EdgeInsets.all(8),
-              child: Text(
-                'Connected: ${BluetoothService.instance.currentDevice!.name ?? BluetoothService.instance.currentDevice!.address}',
-                style: const TextStyle(
-                  color: Color.fromARGB(255, 12, 1, 1),
-                  backgroundColor: Color.fromARGB(66, 37, 209, 252),
-                ),
-              ),
-            ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              ElevatedButton(
-                onPressed: _discovering ? null : _startDiscovery,
-                child: Text(_discovering ? 'Scanning...' : 'Scan'),
-              ),
-              ElevatedButton(
-                onPressed: _getBonded,
-                child: const Text('Paired'),
-              ),
-              ElevatedButton(
-                onPressed: _disconnect,
-                child: const Text('Disconnect'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Expanded(
-            child: _devices.isEmpty
-                ? const Center(child: Text('No devices'))
-                : ListView.builder(
-                    itemCount: _devices.length,
-                    itemBuilder: (_, i) {
-                      final d = _devices[i].device;
-                      final connected =
-                          BluetoothService.instance.currentDevice?.address ==
-                          d.address;
-                      return ListTile(
-                        title: Text(d.name ?? 'Unknown'),
-                        subtitle: Text(d.address),
-                        trailing: ElevatedButton(
-                          onPressed: connected
-                              ? _disconnect
-                              : () => _connect(d),
-                          child: Text(connected ? 'Disconnect' : 'Connect'),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-    );
+    return Scaffold(appBar: buildAppBar(), body: buildBody());
   }
 }
